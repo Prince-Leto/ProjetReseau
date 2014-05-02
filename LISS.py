@@ -1,4 +1,4 @@
-import sublime, sublime_plugin, socket, select
+import sublime, sublime_plugin, socket
 
 client = 0
 views = []
@@ -32,21 +32,20 @@ class AddViewCommand(sublime_plugin.TextCommand):
 		def Listen():
 			global client, data, dataReceived
 			while 1:
-				read, write, errors = select.select([client], [], [])
-				for sock in read:
-					data = sock.recv(BUFFER)
-					if data:
-						data = data.decode()
-						print('Data received')
-						if data[0:1] == "i":
-							self.view.run_command('insertion')
-							dataReceived = 1
-						elif data[0:1] == "d":
-							self.view.run_command('deletion')
-							dataReceived = 1
+				sock = client
+				data = sock.recv(BUFFER)
+				if data:
+					data = data.decode()
+					print('Data received')
+					if data[0:1] == "i":
+						self.view.run_command('insertion')
+						dataReceived = 1
+					elif data[0:1] == "d":
+						self.view.run_command('deletion')
+						dataReceived = 1
 
 		sublime.set_timeout_async(Listen, 0)
-		
+
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
