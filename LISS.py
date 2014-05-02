@@ -8,7 +8,7 @@ data = 0
 dataReceived = 0
 
 HOST = 'localhost'
-PORT = 5002
+PORT = 5003
 BUFFER = 4096
 
 class ListenCommand(sublime_plugin.TextCommand):
@@ -36,13 +36,12 @@ class AddViewCommand(sublime_plugin.TextCommand):
 				data = sock.recv(BUFFER)
 				if data:
 					data = data.decode()
-					print('Data received')
 					if data[0:1] == "i":
+						dataReceived = 1
 						self.view.run_command('insertion')
-						dataReceived = 1
 					elif data[0:1] == "d":
-						self.view.run_command('deletion')
 						dataReceived = 1
+						self.view.run_command('deletion')
 
 		sublime.set_timeout_async(Listen, 0)
 
@@ -50,11 +49,11 @@ class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
 		self.view.insert(edit, int(data[1:].split(",", 2)[0]), data[1:].split(",", 2)[1])
-		# self.view.replace(edit, region, sublime.Region(begin_region_point, end_region_point))
 
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
+		self.view.erase(edit, sublime.Region(int(data[1:].split(",", 2)[0]), int(data[1:].split(",", 2)[1])))
 
 class ListenerCommand(sublime_plugin.EventListener):
 	def on_modified(self, view):

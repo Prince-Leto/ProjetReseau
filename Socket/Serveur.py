@@ -12,7 +12,7 @@ def broadCast(sock, message):
 
 LIST = []
 BUFFER = 4096
-PORT = 5002
+PORT = 5003
 Text = "Empty"
 
 serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
