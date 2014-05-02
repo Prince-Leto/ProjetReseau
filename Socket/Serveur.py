@@ -37,14 +37,18 @@ while 1:
 		else:
 			try:
 				data = sock.recv(BUFFER)
-				if data:
-					broadCast(sock, data)
-					data = data.decode("utf-8")
+				data = data.decode("utf-8")
+				if data == "GetFiles":
+					sock.send("fOne, Two, Three, Four, Five, Six, Seven".encode("utf-8"))
+				elif data:
+					broadCast(sock, data.encode())
 					if data[0:1] == "i":
-						Text += data[1:].split(",", 1)[1]
+						Text = Text[:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + Text[int(data[1:].split(",", 1)[0]):]
 						# Text[int(data[1:].split(",", 1)[0])]
-					# elif data[0:1] == "d":
-					# 	Text = Text[0:int(data[1:].split(",", 1))[0]] + Text[int(data[1:].split(",", 1))[1]:]
+					elif data[0:1] == "d":
+						Text = Text[:int(data[1:].split(",", 1)[0])] + Text[int(data[1:].split(",", 1)[1]):]
+					# print(Text)
+
 			except:
 				print("Client disconnected")
 				sock.close()

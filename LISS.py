@@ -1,4 +1,6 @@
-import sublime, sublime_plugin, socket
+import threading, socket
+
+import sublime, sublime_plugin
 
 client = 0
 views = []
@@ -11,16 +13,23 @@ HOST = 'localhost'
 PORT = 5003
 BUFFER = 4096
 
-class ListenCommand(sublime_plugin.TextCommand):
-	def run(self, edit):
+class RemoteFileCommand(sublime_plugin.TextCommand):
+	def run(self, view):
 		global client
-		client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		client.connect((HOST, PORT))
-		client.send("Socket initialized".encode("utf-8"))
-		self.view.run_command('add_view')
+		if client != 0:
+			client.send("GetFiles".encode("utf-8"))
+
+class ListenCommand(sublime_plugin.TextCommand):
+	def run(self, view):
+		global client
+		if client == 0:
+			client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			client.connect((HOST, PORT))
+			client.send("Socket initialized".encode("utf-8"))
+			self.view.run_command('add_view')
 
 class AddViewCommand(sublime_plugin.TextCommand):
-	def run(self, edit):
+	def run(self, view):
 		global client, views, cursors, data, dataReceived
 		if client != 0:
 			if self.view not in views:
@@ -32,8 +41,7 @@ class AddViewCommand(sublime_plugin.TextCommand):
 		def Listen():
 			global client, data, dataReceived
 			while 1:
-				sock = client
-				data = sock.recv(BUFFER)
+				data = client.recv(BUFFER)
 				if data:
 					data = data.decode("utf-8")
 					if data[0:1] == "i":
@@ -42,13 +50,15 @@ class AddViewCommand(sublime_plugin.TextCommand):
 					elif data[0:1] == "d":
 						dataReceived = 1
 						self.view.run_command('deletion')
+					elif data[0:1] == "f":
+						window = sublime.active_window()
+						window.show_quick_panel(data[1:].split(","), None)
 
 		sublime.set_timeout_async(Listen, 0)
 
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
-		print(data)
 		self.view.insert(edit, int(data[1:].split(",", 1)[0]), data[1:].split(",", 1)[1])
 
 class DeletionCommand(sublime_plugin.TextCommand):
@@ -73,5 +83,6 @@ class ListenerCommand(sublime_plugin.EventListener):
 
 	def on_selection_modified(self, view):
 		global views, cursors, old
-		if view in views:
-			cursors[views.index(view)] = list(view.sel())
+		if client != 0:
+			if view in views:
+				cursors[views.index(view)] = list(view.sel())
