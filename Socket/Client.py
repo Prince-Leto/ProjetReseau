@@ -41,11 +41,11 @@ if __name__ == "__main__":
 					sys.exit()
 				else :
 					#print(data)
-					sys.stdout.write(data.decode() + "\n")
+					sys.stdout.write(data.decode("utf-8") + "\n")
 					prompt()
 
 			#user entered a message
 			else :
 				msg = sys.stdin.readline()
-				s.send(msg.encode())
+				s.send(msg.encode("utf-8"))
 				prompt()

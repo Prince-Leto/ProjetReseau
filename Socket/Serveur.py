@@ -31,7 +31,7 @@ while 1:
 		if sock == serveur:
 			sockc, addr = serveur.accept()
 			LIST.append(sockc)
-			sockc.send(("i0," + Text).encode())
+			sockc.send(("i0," + Text).encode("utf-8"))
 			print("Client (%s, %s) connected" % addr)
 
 		else:
@@ -39,11 +39,12 @@ while 1:
 				data = sock.recv(BUFFER)
 				if data:
 					broadCast(sock, data)
-					data = data.decode()
-					# if data[0:1] == "i":
-					# 	Text[int(data[1:].split(",", 2)[0])]
+					data = data.decode("utf-8")
+					if data[0:1] == "i":
+						Text += data[1:].split(",", 1)[1]
+						# Text[int(data[1:].split(",", 1)[0])]
 					# elif data[0:1] == "d":
-					# 	Text = Text[0:int(data[1:].split(",", 2))[0]] + Text[int(data[1:].split(",", 2))[1]:]
+					# 	Text = Text[0:int(data[1:].split(",", 1))[0]] + Text[int(data[1:].split(",", 1))[1]:]
 			except:
 				print("Client disconnected")
 				sock.close()

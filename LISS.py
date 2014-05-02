@@ -16,7 +16,7 @@ class ListenCommand(sublime_plugin.TextCommand):
 		global client
 		client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		client.connect((HOST, PORT))
-		client.send("Socket initialized".encode())
+		client.send("Socket initialized".encode("utf-8"))
 		self.view.run_command('add_view')
 
 class AddViewCommand(sublime_plugin.TextCommand):
@@ -27,7 +27,7 @@ class AddViewCommand(sublime_plugin.TextCommand):
 				views.append(self.view)
 				cursors.append([])
 				old.append([])
-				client.send("View added".encode())
+				client.send("View added".encode("utf-8"))
 
 		def Listen():
 			global client, data, dataReceived
@@ -35,7 +35,7 @@ class AddViewCommand(sublime_plugin.TextCommand):
 				sock = client
 				data = sock.recv(BUFFER)
 				if data:
-					data = data.decode()
+					data = data.decode("utf-8")
 					if data[0:1] == "i":
 						dataReceived = 1
 						self.view.run_command('insertion')
@@ -48,12 +48,13 @@ class AddViewCommand(sublime_plugin.TextCommand):
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
-		self.view.insert(edit, int(data[1:].split(",", 2)[0]), data[1:].split(",", 2)[1])
+		print(data)
+		self.view.insert(edit, int(data[1:].split(",", 1)[0]), data[1:].split(",", 1)[1])
 
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global data
-		self.view.erase(edit, sublime.Region(int(data[1:].split(",", 2)[0]), int(data[1:].split(",", 2)[1])))
+		self.view.erase(edit, sublime.Region(int(data[1:].split(",", 1)[0]), int(data[1:].split(",", 1)[1])))
 
 class ListenerCommand(sublime_plugin.EventListener):
 	def on_modified(self, view):
@@ -64,9 +65,9 @@ class ListenerCommand(sublime_plugin.EventListener):
 					e = views.index(view)
 					for i in range(len(view.sel())):
 						if cursors[e][i].begin() < view.sel()[i].begin():
-							client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode())
+							client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
 						else:
-							client.send(("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())).encode())
+							client.send(("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())).encode("utf-8"))
 				else:
 					dataReceived = 0
 
