@@ -1,5 +1,7 @@
 [
+	{ "caption": "LISS: Test", "command": "test" },
 	{ "caption": "LISS: Start socket", "command": "listen" },
-	{ "caption": "LISS: Append file ...", "command": "remote_file" },
+	{ "caption": "LISS: Remote files...", "command": "remote_file" },
+	{ "caption": "LISS: Create file...", "command": "create_file" },
 	{ "caption": "LISS: Listen this file", "command": "add_view" }
 ]
