@@ -5,11 +5,10 @@ import sublime, sublime_plugin
 client = 0
 views = []
 cursors = []
-old = []
 data = 0
 dataReceived = 0
 
-HOST = 'localhost'
+HOST = '192.168.1.28'
 PORT = 5003
 BUFFER = 4096
 
@@ -47,7 +46,6 @@ class AddViewCommand(sublime_plugin.TextCommand):
 			if self.view not in views:
 				views.append(self.view)
 				cursors.append([])
-				old.append([])
 
 		def Listen():
 			global client, data, dataReceived
@@ -55,38 +53,38 @@ class AddViewCommand(sublime_plugin.TextCommand):
 				read, write, errors = select.select([client], [], [])
 				for sock in read:
 					data = sock.recv(BUFFER)
-					if data:
-						data = data.decode("utf-8")
-						if data[0:1] == "i":
-							dataReceived = 1
+					data = data.decode("utf-8")
+					print(data)
+					if data[0:1] == "i":
+						dataReceived = 1
+						self.view.run_command('insertion')
+					elif data[0:1] == "d":
+						dataReceived = 1
+						self.view.run_command('deletion')
+					elif data[0:1] == "n":
+						dataReceived = 0
+						if self.view.size() > 0:
+							dataReceived += 1
+							self.view.run_command('erase')
+						if data[1:].split(",", 1)[1] != '':
+							dataReceived += 1
 							self.view.run_command('insertion')
-						elif data[0:1] == "d":
-							dataReceived = 1
-							self.view.run_command('deletion')
-						elif data[0:1] == "n":
-							dataReceived = 0
-							if self.view.size() > 0:
-								dataReceived += 1
-								self.view.run_command('erase')
-							if data[1:].split(",", 1)[1] != '':
-								dataReceived += 1
-								self.view.run_command('insertion')
-						elif data[0:1] == "k":
-							addr = data[1:].split(":")[0]
-							l = data[1:].split(":")[1].split("|")
-							for i in range(len(l)):
-								l[i] = sublime.Region(int(l[i].split(",")[0]),int(l[i].split(",")[1]))
-							self.view.add_regions(addr, l, "string", "dot", sublime.DRAW_EMPTY)
-						elif data[0:1] == "f":
-							if data != "f":
-								def onDone(i):
-									global client
-									if i != -1:
-										client.send(("f" + str(i)).encode("utf-8"))
-								window = sublime.active_window()
-								window.show_quick_panel(data[1:].split(","), onDone)
-							else:
-								sublime.error_message("No file available on server.")
+					elif data[0:1] == "k":
+						addr = data[1:].split(":")[0]
+						l = data[1:].split(":")[1].split("|")
+						for i in range(len(l)):
+							l[i] = sublime.Region(int(l[i].split(",")[0]),int(l[i].split(",")[1]))
+						self.view.add_regions(addr, l, "string", "dot", sublime.DRAW_EMPTY)
+					elif data[0:1] == "f":
+						if data != "f":
+							def onDone(i):
+								global client
+								if i != -1:
+									client.send(("f" + str(i)).encode("utf-8"))
+							window = sublime.active_window()
+							window.show_quick_panel(data[1:].split(","), onDone)
+						else:
+							sublime.error_message("No file available on server.")
 
 		sublime.set_timeout_async(Listen, 0)
 
@@ -126,7 +124,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 					dataReceived -= 1
 
 	def on_selection_modified(self, view):
-		global views, cursors, old
+		global views, cursors
 		if client != 0:
 			if view in views:
 				cursors[views.index(view)] = list(view.sel())

@@ -1,8 +1,24 @@
 import socket, select
 
-def broadCast(sock, message):
+LIST = []
+FILES = {}
+BUFFER = 4096
+PORT = 5003
+TEXT = [['Test', '']]
+
+serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+serveur.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+serveur.bind(("", PORT))
+serveur.listen(10)
+
+LIST.append(serveur)
+
+print("Serveur started on port " + str(PORT))
+
+def BroadCast(sock, message):
 	for socket in LIST:
-		if socket != serveur and socket != sock:
+		if socket != serveur and socket != sock and FILES[sock][0] == FILES[socket][0] and FILES[socket][0] != -1:
 			try:
 				socket.send(message)
 			except:
@@ -10,19 +26,13 @@ def broadCast(sock, message):
 				socket.close()
 				LIST.remove(socket)
 
-LIST = []
-BUFFER = 4096
-PORT = 5003
-Text = "Empty"
-
-serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serveur.bind(("", PORT))
-serveur.listen(10)
-
-LIST.append(serveur)
-
-print("Chat serveur started on port " + str(PORT))
+def RemoteFiles(sock):
+	m = 'f'
+	if len(TEXT) > 0:
+		for f in range(len(TEXT) - 1):
+			m += TEXT[f][0] + ","
+		m += TEXT[len(TEXT) - 1][0]
+	sock.send(m.encode("utf-8"))
 
 while 1:
 	read, write, errors = select.select(LIST, [], [])
@@ -30,29 +40,36 @@ while 1:
 	for sock in read:
 		if sock == serveur:
 			sockc, addr = serveur.accept()
+			# sockc.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 			LIST.append(sockc)
-			sockc.send(("i0," + Text).encode("utf-8"))
+			FILES[sockc] = [-1, addr]
 			print("Client (%s, %s) connected" % addr)
-
+			RemoteFiles(sockc)
 		else:
 			try:
 				data = sock.recv(BUFFER)
 				data = data.decode("utf-8")
+				print(data)
 				if data == "GetFiles":
-					sock.send("fOne, Two, Three, Four, Five, Six, Seven".encode("utf-8"))
+					RemoteFiles(sock)
+				elif data[0:1] == "f":
+					FILES[sock][0] = int(data[1:])
+					sock.send(("n0," + TEXT[FILES[sock][0]][1]).encode("utf-8"))
+				elif data[0:1] == "c":
+					TEXT.append([data[1:], ""])
+				elif data[0:1] == "k":
+					data = data[0:1] + str(FILES[sock][1][1]) + ":" + data[1:]
+					BroadCast(sock, data.encode("utf-8"))
 				elif data:
-					broadCast(sock, data.encode())
+					BroadCast(sock, data.encode("utf-8"))
 					if data[0:1] == "i":
-						Text = Text[:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + Text[int(data[1:].split(",", 1)[0]):]
-						# Text[int(data[1:].split(",", 1)[0])]
+						TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[0]):]
 					elif data[0:1] == "d":
-						Text = Text[:int(data[1:].split(",", 1)[0])] + Text[int(data[1:].split(",", 1)[1]):]
-					# print(Text)
+						TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[1]):]
 
 			except:
-				print("Client disconnected")
+				print('Client disconnected')
 				sock.close()
 				LIST.remove(sock)
-				continue
 
 serveur.close()
