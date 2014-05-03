@@ -13,10 +13,6 @@ HOST = 'localhost'
 PORT = 5003
 BUFFER = 4096
 
-class TestCommand(sublime_plugin.TextCommand):
-	def run(self, view):
-		self.view.add_regions('ColorTest', [sublime.Region(3, 3)], "string", "dot", sublime.DRAW_EMPTY)
-
 class CreateFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global client
@@ -37,8 +33,9 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 class ListenCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global client
-		if not client == 0:
-			client.close()
+		# if client != 0:
+			# print("Closing")
+			# client.close()
 		client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		client.connect((HOST, PORT))
 		self.view.run_command('add_view')
@@ -67,16 +64,25 @@ class AddViewCommand(sublime_plugin.TextCommand):
 							dataReceived = 1
 							self.view.run_command('deletion')
 						elif data[0:1] == "n":
-							dataReceived = 2
-							self.view.run_command('erase')
-							self.view.run_command('insertion')
-						elif data[]
+							dataReceived = 0
+							if self.view.size() > 0:
+								dataReceived += 1
+								self.view.run_command('erase')
+							if data[1:].split(",", 1)[1] != '':
+								dataReceived += 1
+								self.view.run_command('insertion')
+						elif data[0:1] == "k":
+							addr = data[1:].split(":")[0]
+							l = data[1:].split(":")[1].split("|")
+							for i in range(len(l)):
+								l[i] = sublime.Region(int(l[i].split(",")[0]),int(l[i].split(",")[1]))
+							self.view.add_regions(addr, l, "string", "dot", sublime.DRAW_EMPTY)
 						elif data[0:1] == "f":
 							if data != "f":
 								def onDone(i):
-									global sock
+									global client
 									if i != -1:
-										sock.send(("f" + str(i)).encode("utf-8"))
+										client.send(("f" + str(i)).encode("utf-8"))
 								window = sublime.active_window()
 								window.show_quick_panel(data[1:].split(","), onDone)
 							else:
@@ -107,10 +113,15 @@ class ListenerCommand(sublime_plugin.EventListener):
 				if dataReceived == 0:
 					e = views.index(view)
 					for i in range(len(view.sel())):
-						if cursors[e][i].begin() < view.sel()[i].begin():
-							client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
+						if cursors[e][i].begin() != cursors[e][i].end():
+							client.send(("d" + str(cursors[e][i].begin()) + "," + str(cursors[e][i].end())).encode("utf-8"))
+							if cursors[e][i].begin() < view.sel()[i].begin():
+								client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
 						else:
-							client.send(("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())).encode("utf-8"))
+							if cursors[e][i].begin() < view.sel()[i].begin():
+								client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
+							else:
+								client.send(("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())).encode("utf-8"))
 				else:
 					dataReceived -= 1
 
@@ -119,4 +130,8 @@ class ListenerCommand(sublime_plugin.EventListener):
 		if client != 0:
 			if view in views:
 				cursors[views.index(view)] = list(view.sel())
-				client.send(("k" + str(cursors[views.index(view)])).encode("utf-8"))
+				m = ''
+				for i in range(len(view.sel()) - 1):
+					m += str(view.sel()[i].begin()) + "," + str(view.sel()[i].end()) + "|"
+				m += str(view.sel()[len(view.sel()) - 1].begin()) + "," + str(view.sel()[len(view.sel()) - 1].end())
+				client.send(("k" + m).encode("utf-8"))

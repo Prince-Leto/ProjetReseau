@@ -1,7 +1,7 @@
 import socket, select, string, sys
 
 def prompt() :
-	sys.stdout.write('<You> ')
+	sys.stdout.write('-> ')
 	sys.stdout.flush()
 
 if __name__ == "__main__":
