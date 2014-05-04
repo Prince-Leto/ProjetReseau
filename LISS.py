@@ -13,16 +13,23 @@ Host = 'localhost'
 Port = 5000
 BUFFER = 4096
 
+def SeparateData(param):
+	m = []
+	while len(param) > 0:
+		m.append(param[4:4 + int(param[0:4])])
+		param = param[4 + int(param[0:4]):]
+	return m
+
 def PrepareSending(message):
 	l = len(message)
 	m = str(l)
 	if l < 10000:
 		for i in range(1,4):
 			if l < 10**i:
-				m = "0" + m
+				m = '0' + m
 	else:
-		sublime.error_message("Inserting too much text. Please reload the file.")
-	return (m + message).encode("utf-8")
+		sublime.error_message('Inserting too much text. Please reload the file.')
+	return (m + message).encode('utf-8')
 
 # ********************** Create File ********************************
 
@@ -36,10 +43,10 @@ class CreateFileCommand(sublime_plugin.TextCommand):
 				if ',' in m:
 					sublime.error_message('File name not permited.')
 				else:
-					Sockets[index].send(PrepareSending("c" + m))
+					Sockets[index].send(PrepareSending('c' + m))
 			except ValueError:
 				sublime.error_message('This file is not connected.')
-		sublime.active_window().show_input_panel("Name", "", onDone, None, None)
+		sublime.active_window().show_input_panel('Name', '', onDone, None, None)
 
 # ********************** Remote Files ********************************
 
@@ -47,7 +54,7 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 	global Sockets, Infos
 	def run(self, edit):
 		try:
-			Sockets[Infos.index(self.view)].send(PrepareSending("GetFiles"))
+			Sockets[Infos.index(self.view)].send(PrepareSending('GetFiles'))
 		except ValueError:
 			sublime.error_message('This file is not connected.')
 
@@ -55,11 +62,11 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
-		self.view.insert(edit, int(Data.split(",", 1)[0]), Data.split(",", 1)[1])
+		self.view.insert(edit, int(Data.split(',', 1)[0]), Data.split(',', 1)[1])
 
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
-		self.view.erase(edit, sublime.Region(int(Data.split(",", 1)[0]), int(Data.split(",", 1)[1])))
+		self.view.erase(edit, sublime.Region(int(Data.split(',', 1)[0]), int(Data.split(',', 1)[1])))
 
 class EraseCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -81,32 +88,36 @@ def Loop():
 			else:
 				index = Sockets.index(sock)
 				Data = Data.decode('utf-8')
-				print(Data)
-				if Data[0:1] == 'i':
-					DataReceived = 1
-					Infos[index].run_command('insertion', {'Data': Data[1:]})
-				elif Data[0:1] == 'd':
-					DataReceived = 1
-					Infos[index].run_command('deletion', {'Data': Data[1:]})
-				elif Data[0:1] == 'n':
-					DataReceived = 0
-					if Infos[index].size() > 0:
-						DataReceived += 1
-						Infos[index].run_command('erase')
-					if Data[1:].split(",", 1)[1] != '':
-						DataReceived += 1
+				for Data in SeparateData(Data):
+					if Data[0:1] == 'i':
+						DataReceived = 1
 						Infos[index].run_command('insertion', {'Data': Data[1:]})
-				elif Data[0:1] == 'k':
-					pass
-				elif Data[0:1] == 'f':
-					if Data != "f":
-						def onDone(i):
-							global client
-							if i != -1:
-								Sockets[index].send(PrepareSending("f" + str(i)))
-						sublime.active_window().show_quick_panel(Data[1:].split(","), onDone)
-					else:
-						sublime.error_message("No file available on server.")
+					elif Data[0:1] == 'd':
+						DataReceived = 1
+						Infos[index].run_command('deletion', {'Data': Data[1:]})
+					elif Data[0:1] == 'n':
+						DataReceived = 0
+						if Infos[index].size() > 0:
+							DataReceived += 1
+							Infos[index].run_command('erase')
+						if Data[1:].split(',', 1)[1] != '':
+							DataReceived += 1
+							Infos[index].run_command('insertion', {'Data': Data[1:]})
+					elif Data[0:1] == 'k':
+						Addr = Data[1:].split(':')[0]
+						Key = Data[1:].split(':')[1].split('|')
+						for i in range(len(Key)):
+							Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
+						Infos[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
+					elif Data[0:1] == 'f':
+						if Data != 'f':
+							def onDone(i):
+								global client
+								if i != -1:
+									Sockets[index].send(PrepareSending('f' + str(i)))
+							sublime.active_window().show_quick_panel(Data[1:].split(','), onDone)
+						else:
+							sublime.error_message('No file available on server.')
 
 
 class CreateSocketCommand(sublime_plugin.TextCommand):
@@ -115,24 +126,27 @@ class CreateSocketCommand(sublime_plugin.TextCommand):
 
 		def onDone(message):
 			global Sockets, Infos, Cursors, Started
-			Host, Port = message.split(":", 1)
-			Port = int(Port)
-
-			Sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			Infos.append(self.view)
-			Cursors.append(list(self.view.sel()))
-
 			try:
-				Sock.connect((Host, Port))
-				Sockets.append(Sock)
-				if not Started:
-					Started = True
-					sublime.set_timeout_async(Loop, 0)
+				Host, Port = message.split(':', 1)
+				Port = int(Port)
 
+				Sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				Infos.append(self.view)
+				Cursors.append(list(self.view.sel()))
+
+				try:
+					Sock.connect((Host, Port))
+					Sockets.append(Sock)
+					if not Started:
+						Started = True
+						sublime.set_timeout_async(Loop, 0)
+
+				except:
+					sublime.error_message('Unable to connect.')
 			except:
-				sublime.error_message("Unable to connect.")
+				sublime.error_message('Please enter hostname:port.')
 
-		sublime.active_window().show_input_panel("Hostname:port", "", onDone, None, None)
+		sublime.active_window().show_input_panel('Hostname:port', '', onDone, None, None)
 
 # ************************ Retrieving Data **********************************
 
@@ -177,8 +191,8 @@ class ListenerCommand(sublime_plugin.EventListener):
 			Cursors[index] = list(view.sel())
 			m = ''
 			for i in range(len(view.sel()) - 1):
-				m += str(view.sel()[i].begin()) + "," + str(view.sel()[i].end()) + "|"
-			m += str(view.sel()[len(view.sel()) - 1].begin()) + "," + str(view.sel()[len(view.sel()) - 1].end())
-			Sockets[index].send(PrepareSending("k" + m))
+				m += str(view.sel()[i].begin()) + ',' + str(view.sel()[i].end()) + '|'
+			m += str(view.sel()[len(view.sel()) - 1].begin()) + ',' + str(view.sel()[len(view.sel()) - 1].end())
+			Sockets[index].send(PrepareSending('k' + m))
 		except ValueError:
 			pass

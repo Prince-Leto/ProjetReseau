@@ -5,11 +5,13 @@
 - Multiple file on server
 	- Create file
 	- Connect to a file
-- Others's Cursors (pending)
+- Others's Cursors
 - Multiple tab support
 
 ### Todo :
+- Windows Compatibility
 - Fixe bugs
+- Ability to lock a line
 
 ### How to :
 Place project files into your sublime packages directory - commonly ~/.config/sublime-text-3/Packages/ - in a new folder called LISS.

@@ -1,4 +1,15 @@
-import socket, select, string, sys
+import socket, select, sys
+
+def PrepareSending(message):
+	l = len(message)
+	m = str(l)
+	if l < 10000:
+		for i in range(1,4):
+			if l < 10**i:
+				m = "0" + m
+	else:
+		sys.stdout.write("Inserting too much text. Please reload the file.")
+	return (m + message).encode("utf-8")
 
 def prompt() :
 	sys.stdout.write('-> ')
@@ -16,36 +27,37 @@ if __name__ == "__main__":
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.settimeout(2)
 
-	# connect to remote host
 	try :
 		s.connect((host, port))
 	except :
 		print('Unable to connect')
 		sys.exit()
 
-	print('Connected to remote host. Start sending messages')
+	print('Connected to remote host. Start sending messages :')
 	prompt()
 
 	while 1:
 		socket_list = [sys.stdin, s]
 
-		# Get the list sockets which are readable
-		read_sockets, write_sockets, error_sockets = select.select(socket_list , [], [])
+		ready = select.select(socket_list , [], [])
 
-		for sock in read_sockets:
-			#incoming message from remote server
+		for sock in ready[0]:
 			if sock == s:
 				data = sock.recv(4096)
 				if not data :
 					print('\nDisconnected from chat server')
 					sys.exit()
 				else :
-					#print(data)
 					sys.stdout.write(data.decode("utf-8") + "\n")
 					prompt()
 
-			#user entered a message
 			else :
 				msg = sys.stdin.readline()
-				s.send(msg[:len(msg) - 1].encode("utf-8"))
+				# To try with multiple data sending in one packet
+				if msg[0:1] == 'ß':
+					# You're going to shit on :
+					s.send(msg[1:len(msg) - 1].encode('utf-8'))
+				else:
+					s.send(PrepareSending(msg[:len(msg) - 1]))
+
 				prompt()

@@ -5,7 +5,12 @@ FILES = {}
 BUFFER = 4096
 PORT = 5000
 TEXT = [['Test', '']]
-PORT= int(sys.argv[1])
+
+if(len(sys.argv) < 2) :
+	print('Usage : python3 Serveur.py port')
+	sys.exit()
+
+PORT = int(sys.argv[1])
 
 serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -16,6 +21,17 @@ serveur.listen(10)
 LIST.append(serveur)
 
 print("Serveur started on port " + str(PORT))
+
+def PrepareSending(message):
+	l = len(message)
+	m = str(l)
+	if l < 10000:
+		for i in range(1,4):
+			if l < 10**i:
+				m = "0" + m
+	else:
+		sys.stdout.write("Inserting too much text. Please reload the file.")
+	return (m + message).encode("utf-8")
 
 def BroadCast(sock, message):
 	for socket in LIST:
@@ -33,9 +49,14 @@ def RemoteFiles(sock):
 		for f in range(len(TEXT) - 1):
 			m += TEXT[f][0] + ","
 		m += TEXT[len(TEXT) - 1][0]
-	sock.send(m.encode("utf-8"))
+	sock.send(PrepareSending(m))
 
-
+def SeparateData(param):
+	m = []
+	while len(param) > 0:
+		m.append(param[4:4 + int(param[0:4])])
+		param = param[4 + int(param[0:4]):]
+	return m
 
 while 1:
 	read, write, errors = select.select(LIST, [], [])
@@ -52,25 +73,23 @@ while 1:
 			try:
 				data = sock.recv(BUFFER)
 				data = data.decode("utf-8")
-				print(data)
-				size = int(data[0:4])
-				data = data[4:4 + size]
-				if data == "GetFiles":
-					RemoteFiles(sock)
-				elif data[0:1] == "f":
-					FILES[sock][0] = int(data[1:])
-					sock.send(("n0," + TEXT[FILES[sock][0]][1]).encode("utf-8"))
-				elif data[0:1] == "c":
-					TEXT.append([data[1:], ""])
-				elif data[0:1] == "k":
-					data = data[0:1] + str(FILES[sock][1][1]) + ":" + data[1:]
-					BroadCast(sock, data.encode("utf-8"))
-				elif data:
-					BroadCast(sock, data.encode("utf-8"))
-					if data[0:1] == "i":
-						TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[0]):]
-					elif data[0:1] == "d":
-						TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[1]):]
+				for data in SeparateData(data):
+					if data == "GetFiles":
+						RemoteFiles(sock)
+					elif data[0:1] == "f":
+						FILES[sock][0] = int(data[1:])
+						sock.send(PrepareSending("n0," + TEXT[FILES[sock][0]][1]))
+					elif data[0:1] == "c":
+						TEXT.append([data[1:], ""])
+					elif data[0:1] == "k":
+						data = data[0:1] + str(FILES[sock][1][1]) + ":" + data[1:]
+						BroadCast(sock, PrepareSending(data))
+					elif data:
+						BroadCast(sock, PrepareSending(data))
+						if data[0:1] == "i":
+							TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[0]):]
+						elif data[0:1] == "d":
+							TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[1]):]
 
 			except:
 				print('Client disconnected')
