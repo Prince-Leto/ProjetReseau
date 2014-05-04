@@ -1,10 +1,11 @@
-import socket, select
+import socket, select, sys
 
 LIST = []
 FILES = {}
 BUFFER = 4096
-PORT = 5003
+PORT = 5000
 TEXT = [['Test', '']]
+PORT= int(sys.argv[1])
 
 serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,6 +34,8 @@ def RemoteFiles(sock):
 			m += TEXT[f][0] + ","
 		m += TEXT[len(TEXT) - 1][0]
 	sock.send(m.encode("utf-8"))
+
+
 
 while 1:
 	read, write, errors = select.select(LIST, [], [])

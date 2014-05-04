@@ -1,6 +1,5 @@
 [
-	{ "caption": "LISS: Start socket", "command": "listen" },
-	{ "caption": "LISS: Remote files...", "command": "remote_file" },
-	{ "caption": "LISS: Create file...", "command": "create_file" },
-	{ "caption": "LISS: Listen this file", "command": "add_view" }
+	{ "caption": "LISS: Connect this file...", "command": "create_socket" },
+	{ "caption": "LISS: Create new file...", "command": "create_file" },
+	{ "caption": "LISS: Select file...", "command": "remote_file" }
 ]

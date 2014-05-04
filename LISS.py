@@ -1,15 +1,16 @@
-import threading, socket, select
+import socket, sys
+from select import select
 
 import sublime, sublime_plugin
 
-client = 0
-views = []
-cursors = []
-data = 0
-dataReceived = 0
+Sockets = []
+Infos = []
+Cursors = []
+Started = False
+DataReceived = 0
 
-HOST = 'localhost'
-PORT = 5003
+Host = 'localhost'
+Port = 5000
 BUFFER = 4096
 
 def PrepareSending(message):
@@ -19,129 +20,165 @@ def PrepareSending(message):
 		for i in range(1,4):
 			if l < 10**i:
 				m = "0" + m
+	else:
+		sublime.error_message("Inserting too much text. Please reload the file.")
 	return (m + message).encode("utf-8")
+
+# ********************** Create File ********************************
 
 class CreateFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
-		global client
-		if client != 0:
-			window = sublime.active_window()
-			def onDone(m):
-				global client
-				client.send(PrepareSending("c" + m))
+		global Sockets, Infos
+		def onDone(m):
+			global Sockets, Infos
+			try:
+				index = Infos.index(sublime.active_window().active_view()) # Bad... But we cannot get parameters and I don't want an other global variable
+				if ',' in m:
+					sublime.error_message('File name not permited.')
+				else:
+					Sockets[index].send(PrepareSending("c" + m))
+			except ValueError:
+				sublime.error_message('This file is not connected.')
+		sublime.active_window().show_input_panel("Name", "", onDone, None, None)
 
-			window.show_input_panel("Name", "", onDone, None, None)
+# ********************** Remote Files ********************************
 
 class RemoteFileCommand(sublime_plugin.TextCommand):
-	def run(self, view):
-		global client
-		if client != 0:
-			client.send(PrepareSending("GetFiles"))
-
-class ListenCommand(sublime_plugin.TextCommand):
-	def run(self, view):
-		global client
-		if client != 0:
-			client.close()
+	global Sockets, Infos
+	def run(self, edit):
 		try:
-			client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			client.connect((HOST, PORT))
-		except:
-			sublime.error_message("Unable to connect.")
-		self.view.run_command('add_view')
+			Sockets[Infos.index(self.view)].send(PrepareSending("GetFiles"))
+		except ValueError:
+			sublime.error_message('This file is not connected.')
 
-class AddViewCommand(sublime_plugin.TextCommand):
-	def run(self, view):
-		global client, views, cursors, data, dataReceived
-		if client != 0:
-			if self.view not in views:
-				views.append(self.view)
-				cursors.append([])
+# ********************* Modify buffer ********************************
 
-		def Listen():
-			global client, data, dataReceived
-			while 1:
-				try:
-					data = client.recv(BUFFER)
-					data = data.decode("utf-8")
-					print(data)
-					if data[0:1] == "i":
-						dataReceived = 1
-						self.view.run_command('insertion')
-					elif data[0:1] == "d":
-						dataReceived = 1
-						self.view.run_command('deletion')
-					elif data[0:1] == "n":
-						dataReceived = 0
-						if self.view.size() > 0:
-							dataReceived += 1
-							self.view.run_command('erase')
-						if data[1:].split(",", 1)[1] != '':
-							dataReceived += 1
-							self.view.run_command('insertion')
-					elif data[0:1] == "k":
-						addr = data[1:].split(":")[0]
-						l = data[1:].split(":")[1].split("|")
-						for i in range(len(l)):
-							l[i] = sublime.Region(int(l[i].split(",")[0]),int(l[i].split(",")[1]))
-						self.view.add_regions(addr, l, "string", "dot", sublime.DRAW_EMPTY)
-					elif data[0:1] == "f":
-						if data != "f":
-							def onDone(i):
-								global client
-								if i != -1:
-									client.send(PrepareSending("f" + str(i)))
-							window = sublime.active_window()
-							window.show_quick_panel(data[1:].split(","), onDone)
-						else:
-							sublime.error_message("No file available on server.")
-				except:
-					sublime.error_message("Connection lost.")
+class InsertionCommand(sublime_plugin.TextCommand):
+	def run(self, edit, Data):
+		self.view.insert(edit, int(Data.split(",", 1)[0]), Data.split(",", 1)[1])
 
-		sublime.set_timeout_async(Listen, 0)
+class DeletionCommand(sublime_plugin.TextCommand):
+	def run(self, edit, Data):
+		self.view.erase(edit, sublime.Region(int(Data.split(",", 1)[0]), int(Data.split(",", 1)[1])))
 
 class EraseCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		global data
 		self.view.erase(edit, sublime.Region(0, self.view.size()))
 
-class InsertionCommand(sublime_plugin.TextCommand):
-	def run(self, edit):
-		global data
-		self.view.insert(edit, int(data[1:].split(",", 1)[0]), data[1:].split(",", 1)[1])
+def Loop():
+	global Sockets, Infos, DataReceived
+	while True:
+		Ready = select(Sockets, [], [])
+		for sock in Ready[0]:
+			Data = sock.recv(BUFFER)
+			if not Data:
+				sublime.error_message('Connection lost.')
+				sock.close()
+				index = Sockets.index(sock)
+				Sockets.remove(sock)
+				del Infos[index]
+				del Cursors[index]
+			else:
+				index = Sockets.index(sock)
+				Data = Data.decode('utf-8')
+				print(Data)
+				if Data[0:1] == 'i':
+					DataReceived = 1
+					Infos[index].run_command('insertion', {'Data': Data[1:]})
+				elif Data[0:1] == 'd':
+					DataReceived = 1
+					Infos[index].run_command('deletion', {'Data': Data[1:]})
+				elif Data[0:1] == 'n':
+					DataReceived = 0
+					if Infos[index].size() > 0:
+						DataReceived += 1
+						Infos[index].run_command('erase')
+					if Data[1:].split(",", 1)[1] != '':
+						DataReceived += 1
+						Infos[index].run_command('insertion', {'Data': Data[1:]})
+				elif Data[0:1] == 'k':
+					pass
+				elif Data[0:1] == 'f':
+					if Data != "f":
+						def onDone(i):
+							global client
+							if i != -1:
+								Sockets[index].send(PrepareSending("f" + str(i)))
+						sublime.active_window().show_quick_panel(Data[1:].split(","), onDone)
+					else:
+						sublime.error_message("No file available on server.")
 
-class DeletionCommand(sublime_plugin.TextCommand):
+
+class CreateSocketCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		global data
-		self.view.erase(edit, sublime.Region(int(data[1:].split(",", 1)[0]), int(data[1:].split(",", 1)[1])))
+		global Sockets, Infos, Cursors, Started
+
+		def onDone(message):
+			global Sockets, Infos, Cursors, Started
+			Host, Port = message.split(":", 1)
+			Port = int(Port)
+
+			Sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			Infos.append(self.view)
+			Cursors.append(list(self.view.sel()))
+
+			try:
+				Sock.connect((Host, Port))
+				Sockets.append(Sock)
+				if not Started:
+					Started = True
+					sublime.set_timeout_async(Loop, 0)
+
+			except:
+				sublime.error_message("Unable to connect.")
+
+		sublime.active_window().show_input_panel("Hostname:port", "", onDone, None, None)
+
+# ************************ Retrieving Data **********************************
+
+
+def FormatData(Cursors, View, i):
+	if Cursors[i].begin() != Cursors[i].end():
+		m = 'd' + str(Cursors[i].begin()) + ',' + str(Cursors[i].end())
+		if Cursors[i].begin() < View.sel()[i].begin():
+			m += '|i' + str(Cursors[i].begin()) + ',' + View.substr(sublime.Region(Cursors[i].begin() + i, View.sel()[i].begin()))
+		return m
+	else:
+		if Cursors[i].begin() < View.sel()[i].begin():
+			return 'i' + str(Cursors[i].begin()) + ',' + View.substr(sublime.Region(Cursors[i].begin() + i, View.sel()[i].begin()))
+		elif Cursors[i].begin() > View.sel()[i].begin():
+			return 'd' + str(View.sel()[i].begin()) + ',' + str(Cursors[i].begin())
+		else:
+			return ''
 
 class ListenerCommand(sublime_plugin.EventListener):
 	def on_modified(self, view):
-		global client, views, cursors, dataReceived
-		if client != 0:
-			if view in views:
-				if dataReceived == 0:
-					e = views.index(view)
-					for i in range(len(view.sel())):
-						if cursors[e][i].begin() != cursors[e][i].end():
-							client.send(PrepareSending("d" + str(cursors[e][i].begin()) + "," + str(cursors[e][i].end())))
-							if cursors[e][i].begin() < view.sel()[i].begin():
-								client.send(PrepareSending("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))))
-						else:
-							if cursors[e][i].begin() < view.sel()[i].begin():
-								client.send(PrepareSending("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))))
-							else:
-								client.send(PrepareSending("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())))
+		global Sockets, Infos, Cursors, DataReceived
+		if DataReceived == 0:
+			try:
+				index = Infos.index(view)
+				if len(view.sel()) != len(Cursors[index]):
+					sublime.error_message('This situation sucks.')
 				else:
-					dataReceived -= 1
+					m = ''
+					for i in range(len(view.sel()) - 1):
+						m += FormatData(Cursors[index], view, i) + '|'
+					m += FormatData(Cursors[index], view, len(view.sel()) - 1)
+					Sockets[index].send(PrepareSending(m))
 
+			except ValueError:
+				pass
+		else:
+			DataReceived -= 1
 	def on_selection_modified(self, view):
-		global views, cursors
-		if client != 0:
-			if view in views:
-				cursors[views.index(view)] = list(view.sel())
-				m = ''
-				for i in range(len(view.sel()) - 1):
-					m += str(view.sel()[i].begin()) + "," + str(view.sel()[i].end()) + "|"
-				m += str(view.sel()[len(view.sel()) - 1].begin()) + "," + str(view.sel()[len(view.sel()) - 1].end())
-				client.send(PrepareSending("k" + m))
+		global Sockets, Infos, Cursors
+		try:
+			index = Infos.index(view)
+			Cursors[index] = list(view.sel())
+			m = ''
+			for i in range(len(view.sel()) - 1):
+				m += str(view.sel()[i].begin()) + "," + str(view.sel()[i].end()) + "|"
+			m += str(view.sel()[len(view.sel()) - 1].begin()) + "," + str(view.sel()[len(view.sel()) - 1].end())
+			Sockets[index].send(PrepareSending("k" + m))
+		except ValueError:
+			pass
