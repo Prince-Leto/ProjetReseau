@@ -9,9 +9,11 @@
 - Multiple tab support
 
 ### Todo :
-- Windows Compatibility
 - Fixe bugs
+- Windows compatibility
 - Ability to lock a line
+- Save data in real file
+- Add plugin to wbond
 
 ### How to :
 Place project files into your sublime packages directory - commonly ~/.config/sublime-text-3/Packages/ - in a new folder called LISS.
