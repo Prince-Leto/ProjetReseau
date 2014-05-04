@@ -8,9 +8,18 @@ cursors = []
 data = 0
 dataReceived = 0
 
-HOST = '192.168.1.28'
+HOST = 'localhost'
 PORT = 5003
 BUFFER = 4096
+
+def PrepareSending(message):
+	l = len(message)
+	m = str(l)
+	if l < 10000:
+		for i in range(1,4):
+			if l < 10**i:
+				m = "0" + m
+	return (m + message).encode("utf-8")
 
 class CreateFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
@@ -19,7 +28,7 @@ class CreateFileCommand(sublime_plugin.TextCommand):
 			window = sublime.active_window()
 			def onDone(m):
 				global client
-				client.send(("c" + m).encode("utf-8"))
+				client.send(PrepareSending("c" + m))
 
 			window.show_input_panel("Name", "", onDone, None, None)
 
@@ -27,16 +36,18 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global client
 		if client != 0:
-			client.send("GetFiles".encode("utf-8"))
+			client.send(PrepareSending("GetFiles"))
 
 class ListenCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global client
-		# if client != 0:
-			# print("Closing")
-			# client.close()
-		client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		client.connect((HOST, PORT))
+		if client != 0:
+			client.close()
+		try:
+			client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			client.connect((HOST, PORT))
+		except:
+			sublime.error_message("Unable to connect.")
 		self.view.run_command('add_view')
 
 class AddViewCommand(sublime_plugin.TextCommand):
@@ -50,9 +61,8 @@ class AddViewCommand(sublime_plugin.TextCommand):
 		def Listen():
 			global client, data, dataReceived
 			while 1:
-				read, write, errors = select.select([client], [], [])
-				for sock in read:
-					data = sock.recv(BUFFER)
+				try:
+					data = client.recv(BUFFER)
 					data = data.decode("utf-8")
 					print(data)
 					if data[0:1] == "i":
@@ -80,11 +90,13 @@ class AddViewCommand(sublime_plugin.TextCommand):
 							def onDone(i):
 								global client
 								if i != -1:
-									client.send(("f" + str(i)).encode("utf-8"))
+									client.send(PrepareSending("f" + str(i)))
 							window = sublime.active_window()
 							window.show_quick_panel(data[1:].split(","), onDone)
 						else:
 							sublime.error_message("No file available on server.")
+				except:
+					sublime.error_message("Connection lost.")
 
 		sublime.set_timeout_async(Listen, 0)
 
@@ -112,14 +124,14 @@ class ListenerCommand(sublime_plugin.EventListener):
 					e = views.index(view)
 					for i in range(len(view.sel())):
 						if cursors[e][i].begin() != cursors[e][i].end():
-							client.send(("d" + str(cursors[e][i].begin()) + "," + str(cursors[e][i].end())).encode("utf-8"))
+							client.send(PrepareSending("d" + str(cursors[e][i].begin()) + "," + str(cursors[e][i].end())))
 							if cursors[e][i].begin() < view.sel()[i].begin():
-								client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
+								client.send(PrepareSending("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))))
 						else:
 							if cursors[e][i].begin() < view.sel()[i].begin():
-								client.send(("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))).encode("utf-8"))
+								client.send(PrepareSending("i" + str(cursors[e][i].begin()) + "," + view.substr(sublime.Region(cursors[e][i].begin() + i, view.sel()[i].begin()))))
 							else:
-								client.send(("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())).encode("utf-8"))
+								client.send(PrepareSending("d" + str(view.sel()[i].begin()) + "," + str(cursors[e][i].begin())))
 				else:
 					dataReceived -= 1
 
@@ -132,4 +144,4 @@ class ListenerCommand(sublime_plugin.EventListener):
 				for i in range(len(view.sel()) - 1):
 					m += str(view.sel()[i].begin()) + "," + str(view.sel()[i].end()) + "|"
 				m += str(view.sel()[len(view.sel()) - 1].begin()) + "," + str(view.sel()[len(view.sel()) - 1].end())
-				client.send(("k" + m).encode("utf-8"))
+				client.send(PrepareSending("k" + m))

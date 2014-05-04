@@ -8,7 +8,7 @@ TEXT = [['Test', '']]
 
 serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serveur.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+# serveur.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 serveur.bind(("", PORT))
 serveur.listen(10)
 
@@ -50,6 +50,8 @@ while 1:
 				data = sock.recv(BUFFER)
 				data = data.decode("utf-8")
 				print(data)
+				size = int(data[0:4])
+				data = data[4:4 + size]
 				if data == "GetFiles":
 					RemoteFiles(sock)
 				elif data[0:1] == "f":
