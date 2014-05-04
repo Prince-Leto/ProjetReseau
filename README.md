@@ -3,7 +3,9 @@
 ### Features :
 - Instant communication
 - Multiple file on server
-- Others's Cursors
+	- Create file
+	- Connect to a file
+- Others's Cursors (pending)
 - Multiple tab support
 
 ### Todo :
@@ -16,4 +18,4 @@ Start server using `python3 Socket/Serveur.py 5000`
 
 In order to debug you can start a console client `python3 Socket/Client.py localhost 5000`
 
-And start using our plugin. You can do « Connect this file | ctrl+shift+i » to start using your server.
+And start using our plugin. You can do « Connect this file | ctrl+shift+i » on an empty file to start using your server.
