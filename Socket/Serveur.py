@@ -114,7 +114,7 @@ while 1:
 						elif data[0:1] == "d":
 							TEXT[FILES[sock][0]][2] += 1
 							TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[1]):]
-						if TEXT[FILES[sock][0]][2] >= MAX_MODIF
+						if TEXT[FILES[sock][0]][2] >= MAX_MODIF:
 							TEXT[FILES[sock][0]][2] = 0
 							WriteFile(FILES[sock][0])
 			except:

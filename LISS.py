@@ -6,6 +6,7 @@ import sublime, sublime_plugin
 Sockets = []
 Infos = []
 Cursors = []
+OCursors = []
 Started = False
 DataReceived = 0
 
@@ -62,18 +63,28 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
 		self.view.insert(edit, int(Data.split(',', 1)[0]), Data.split(',', 1)[1])
+		self.view.set_read_only(status)
+
 
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
 		self.view.erase(edit, sublime.Region(int(Data.split(',', 1)[0]), int(Data.split(',', 1)[1])))
+		self.view.set_read_only(status)
 
 class EraseCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
 		self.view.erase(edit, sublime.Region(0, self.view.size()))
+		self.view.set_read_only(status)
 
 def Loop():
-	global Sockets, Infos, DataReceived
+	global Sockets, Infos, DataReceived, OCursors
 	while True:
 		Ready = select(Sockets, [], [])
 		for sock in Ready[0]:
@@ -108,6 +119,7 @@ def Loop():
 						Key = Data[1:].split(':')[1].split('|')
 						for i in range(len(Key)):
 							Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
+						OCursors[index] = Key
 						Infos[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
 					elif Data[0:1] == 'f':
 						if Data != 'f':
@@ -122,7 +134,7 @@ def Loop():
 
 class CreateSocketCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		global Sockets, Infos, Cursors, Started
+		global Sockets, Infos, Cursors, OCursors, Started
 
 		def onDone(message):
 			global Sockets, Infos, Cursors, Started
@@ -133,6 +145,7 @@ class CreateSocketCommand(sublime_plugin.TextCommand):
 				Sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 				Infos.append(self.view)
 				Cursors.append(list(self.view.sel()))
+				OCursors.append([])
 
 				try:
 					Sock.connect((Host, Port))
@@ -185,7 +198,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 		else:
 			DataReceived -= 1
 	def on_selection_modified(self, view):
-		global Sockets, Infos, Cursors
+		global Sockets, Infos, Cursors, OCursors
 		try:
 			index = Infos.index(view)
 			Cursors[index] = list(view.sel())
@@ -194,5 +207,13 @@ class ListenerCommand(sublime_plugin.EventListener):
 				m += str(view.sel()[i].begin()) + ',' + str(view.sel()[i].end()) + '|'
 			m += str(view.sel()[len(view.sel()) - 1].begin()) + ',' + str(view.sel()[len(view.sel()) - 1].end())
 			Sockets[index].send(PrepareSending('k' + m))
+			Over = False
+			for K in OCursors[index]:
+				for L in Cursors[index]:
+					if (view.line(K.begin()).begin() <= view.line(L.begin()).begin() and view.line(L.begin()).begin() <= view.line(K.end()).end()) or (view.line(L.begin()).begin() <= view.line(K.begin()).begin() and view.line(K.begin()).begin() <= view.line(L.end()).end()) or (view.line(K.begin()).begin() >= view.line(L.begin()).begin() and view.line(L.end()).end() <= view.line(K.end()).end()): # Brain fuck
+						Over = True
+
+			view.set_read_only(Over)
+	
 		except ValueError:
 			pass
