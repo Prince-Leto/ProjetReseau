@@ -1,10 +1,31 @@
-import socket, select, sys
+import socket, select, sys, os
 
 LIST = []
 FILES = {}
 BUFFER = 4096
 PORT = 5000
-TEXT = [['Test', '']]
+TEXT = []
+MAX_MODIF = 10
+
+def LookFiles():
+	global TEXT
+	try: 
+		for f in os.listdir('LISSData'):
+			if os.path.isfile(os.path.join('LISSData', f)):
+				rf = open(os.path.join('LISSData', f), 'r')
+				t = rf.read()
+				rf.close()
+				TEXT.append([f, t, 0])
+	except:
+		os.mkdir('LISSData')
+
+LookFiles()
+
+def WriteFile(i):
+	global TEXT
+	f=open (os.path.join('LISSData', TEXT[i][0]), 'w')
+	f.write(TEXT[i][1])
+	f.close()
 
 if(len(sys.argv) < 2) :
 	print('Usage : python3 Serveur.py port')
@@ -81,16 +102,21 @@ while 1:
 						sock.send(PrepareSending("n0," + TEXT[FILES[sock][0]][1]))
 					elif data[0:1] == "c":
 						TEXT.append([data[1:], ""])
+						RemoteFiles(sock)
 					elif data[0:1] == "k":
 						data = data[0:1] + str(FILES[sock][1][1]) + ":" + data[1:]
 						BroadCast(sock, PrepareSending(data))
 					elif data:
 						BroadCast(sock, PrepareSending(data))
 						if data[0:1] == "i":
+							TEXT[FILES[sock][0]][2] += 1
 							TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + data[1:].split(",", 1)[1] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[0]):]
 						elif data[0:1] == "d":
+							TEXT[FILES[sock][0]][2] += 1
 							TEXT[FILES[sock][0]][1] = TEXT[FILES[sock][0]][1][:int(data[1:].split(",", 1)[0])] + TEXT[FILES[sock][0]][1][int(data[1:].split(",", 1)[1]):]
-
+						if TEXT[FILES[sock][0]][2] >= MAX_MODIF
+							TEXT[FILES[sock][0]][2] = 0
+							WriteFile(FILES[sock][0])
 			except:
 				print('Client disconnected')
 				sock.close()
