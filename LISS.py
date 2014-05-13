@@ -14,6 +14,7 @@ Host = 'localhost'
 Port = 5000
 BUFFER = 4096
 
+# SeparateData sépare les informations de manière logique, soit taille(0000-9999)+données
 def SeparateData(param):
 	m = []
 	while len(param) > 0:
@@ -21,6 +22,7 @@ def SeparateData(param):
 		param = param[4 + int(param[0:4]):]
 	return m
 
+# PrepareSending formate le message avec le nombre de charactère devant.
 def PrepareSending(message):
 	l = len(message)
 	m = str(l)
@@ -34,6 +36,7 @@ def PrepareSending(message):
 
 # ********************** Create File ********************************
 
+# CreateFileCommand commande pour la création d'un fichier plus l'envoie au serveur
 class CreateFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global Sockets, Infos
@@ -51,6 +54,7 @@ class CreateFileCommand(sublime_plugin.TextCommand):
 
 # ********************** Remote Files ********************************
 
+# RemoteFileCommand envoie une demande de la liste des fichiers au serveur
 class RemoteFileCommand(sublime_plugin.TextCommand):
 	global Sockets, Infos
 	def run(self, edit):
@@ -61,6 +65,7 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 
 # ********************* Modify buffer ********************************
 
+# Insertion de texte
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
 		status = self.view.is_read_only()
@@ -68,7 +73,7 @@ class InsertionCommand(sublime_plugin.TextCommand):
 		self.view.insert(edit, int(Data.split(',', 1)[0]), Data.split(',', 1)[1])
 		self.view.set_read_only(status)
 
-
+# Suppression de texte
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
 		status = self.view.is_read_only()
@@ -76,6 +81,7 @@ class DeletionCommand(sublime_plugin.TextCommand):
 		self.view.erase(edit, sublime.Region(int(Data.split(',', 1)[0]), int(Data.split(',', 1)[1])))
 		self.view.set_read_only(status)
 
+# Supprime l'ensemble du fichier
 class EraseCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		status = self.view.is_read_only()
@@ -83,11 +89,13 @@ class EraseCommand(sublime_plugin.TextCommand):
 		self.view.erase(edit, sublime.Region(0, self.view.size()))
 		self.view.set_read_only(status)
 
+# Loop boucle infinie chargée d'écouter les sockets
 def Loop():
 	global Sockets, Infos, DataReceived, OCursors
 	while True:
-		Ready = select(Sockets, [], [])
-		for sock in Ready[0]:
+		# Ready = select(Sockets, [], [])
+		# for sock in Ready[0]:
+		for sock in Sockets:
 			Data = sock.recv(BUFFER)
 			if not Data:
 				sublime.error_message('Connection lost.')
@@ -121,6 +129,7 @@ def Loop():
 							Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
 						OCursors[index] = Key
 						Infos[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
+						# to do lock cursor
 					elif Data[0:1] == 'f':
 						if Data != 'f':
 							def onDone(i):
@@ -210,8 +219,21 @@ class ListenerCommand(sublime_plugin.EventListener):
 			Over = False
 			for K in OCursors[index]:
 				for L in Cursors[index]:
-					if (view.line(K.begin()).begin() <= view.line(L.begin()).begin() and view.line(L.begin()).begin() <= view.line(K.end()).end()) or (view.line(L.begin()).begin() <= view.line(K.begin()).begin() and view.line(K.begin()).begin() <= view.line(L.end()).end()) or (view.line(K.begin()).begin() >= view.line(L.begin()).begin() and view.line(L.end()).end() <= view.line(K.end()).end()): # Brain fuck
-						Over = True
+					if L.begin() == L.end():
+						if view.line(K.begin()) == view.line(L.begin()):
+							if L.end() == view.size():
+								DataReceived = 1
+								view.run_command('insertion', {'Data': str(view.size()) + ',' + '\n'})
+							else:
+								Over = True
+					else:
+						pass
+						#to do selection
+
+						# if  (view.line(K.begin()).begin() >= view.line(L.begin()).begin() and view.line(K.end()).end() <= view.line(L.begin()).begin()) or (view.line(K.begin()).begin() >= view.line(L.end()).end() and view.line(K.end()).end() <= view.line(L.end()).end()) or (view.line(K.begin()).begin() <= view.line(L.begin()).begin() and view.line(K.end()).end() >= view.line(L.end()).end()):
+							
+						# 	Over = True
+
 
 			view.set_read_only(Over)
 	
