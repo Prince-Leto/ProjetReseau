@@ -129,7 +129,15 @@ def Loop():
 							Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
 						OCursors[index] = Key
 						Infos[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
-						# to do lock cursor
+						Over = False
+						for K in OCursors[index]:
+							for L in Cursors[index]:			
+								for l_other in Infos[index].lines(K):
+									for l_me in Infos[index].lines(L):
+										if l_me == l_other:
+											Over = True
+
+						Infos[index].set_read_only(Over)
 					elif Data[0:1] == 'f':
 						if Data != 'f':
 							def onDone(i):
@@ -217,23 +225,17 @@ class ListenerCommand(sublime_plugin.EventListener):
 			m += str(view.sel()[len(view.sel()) - 1].begin()) + ',' + str(view.sel()[len(view.sel()) - 1].end())
 			Sockets[index].send(PrepareSending('k' + m))
 			Over = False
+
+
 			for K in OCursors[index]:
-				for L in Cursors[index]:
-					if L.begin() == L.end():
-						if view.line(K.begin()) == view.line(L.begin()):
-							if L.end() == view.size():
-								DataReceived = 1
-								view.run_command('insertion', {'Data': str(view.size()) + ',' + '\n'})
-							else:
-								Over = True
-					else:
-						pass
-						#to do selection
-
-						# if  (view.line(K.begin()).begin() >= view.line(L.begin()).begin() and view.line(K.end()).end() <= view.line(L.begin()).begin()) or (view.line(K.begin()).begin() >= view.line(L.end()).end() and view.line(K.end()).end() <= view.line(L.end()).end()) or (view.line(K.begin()).begin() <= view.line(L.begin()).begin() and view.line(K.end()).end() >= view.line(L.end()).end()):
-							
-						# 	Over = True
-
+				for L in Cursors[index]:			
+					for l_other in view.lines(K):
+						for l_me in view.lines(L):
+							if l_me == l_other:
+					 			Over = True
+			if Over and len(Cursors[index]) == 1 and Cursors[index][0].end() == Cursors[index][0].begin() and Cursors[index][0].begin() == view.size():
+				DataReceived = 1
+				view.run_command('insertion', {'Data': str(view.size()) + ',' + '\n'})
 
 			view.set_read_only(Over)
 	
