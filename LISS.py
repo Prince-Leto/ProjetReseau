@@ -1,4 +1,4 @@
-import socket, sys, difflib
+import socket, difflib
 from select import select
 
 import sublime, sublime_plugin
@@ -14,24 +14,105 @@ Started = False
 Buffer = 4096
 
 def Encode(Mesage):
-	return Mesage.encode('utf-8')
+	return (Mesage + chr(1)).encode('utf-8')
+
+def SeparateData(Data):
+	Data = Data[:len(Data) - 1]
+	return Data.split(chr(1))
+
+class RemoteFileCommand(sublime_plugin.TextCommand):
+	global Sockets, Vues
+	def run(self, edit):
+		try:
+			Sockets[Vues.index(self.view)].send(Encode('GetFiles'))
+		except ValueError:
+			sublime.error_message('This file is not connected.')
+
+class CreateFileCommand(sublime_plugin.TextCommand):
+	def run(self, view):
+		global Sockets, Vues
+		def onDone(m):
+			global Sockets, Vues
+			try:
+				index = Vues.index(sublime.active_window().active_view()) # Bad... But we cannot get parameters and I don't want an other global variable
+				if ',' in m:
+					sublime.error_message('File name not permited.')
+				else:
+					Sockets[index].send(Encode('c' + m))
+			except ValueError:
+				sublime.error_message('This file is not connected.')
+		sublime.active_window().show_input_panel('Name', '', onDone, None, None)
+
+class InsertionCommand(sublime_plugin.TextCommand):
+	def run(self, edit, Data):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
+		self.view.insert(edit, int(Data.split(',', 1)[0]), Data.split(',', 1)[1])
+		self.view.set_read_only(status)
+
+class DeletionCommand(sublime_plugin.TextCommand):
+	def run(self, edit, Data):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
+		self.view.erase(edit, sublime.Region(int(Data.split(',', 1)[0]), int(Data.split(',', 1)[1])))
+		self.view.set_read_only(status)
+
+class EraseCommand(sublime_plugin.TextCommand):
+	def run(self, edit):
+		status = self.view.is_read_only()
+		self.view.set_read_only(False)
+		self.view.erase(edit, sublime.Region(0, self.view.size()))
+		self.view.set_read_only(status)
 
 def Loop():
 	global Sockets, Vues, DataReceived, OCursors
 	while True:
 		Ready = select(Sockets, [], [])
 		for Sock in Ready[0]:
-			Data = Sock.recv(Buffer).decode('utf-8')
+			Data = Sock.recv(Buffer)
 			if not Data:
 				sublime.error_message('Connection lost.')
 				Sock.close()
 				index = Sockets.index(Sock)
 				del Sockets[index]
-				del Infos[index]
+				del Vues[index]
 				del Cursors[index]
 			else:
 				try:
 					index = Sockets.index(Sock)
+					Data = Data.decode('utf-8')
+					print(Data)
+					for Data in SeparateData(Data):
+						if Data[0:1] == 'f':
+							if Data != 'f':
+								def onDone(i):
+									global client
+									if i != -1:
+										Sockets[index].send(Encode('f' + str(i)))
+								sublime.active_window().show_quick_panel(Data[1:].split(','), onDone)
+							else:
+								sublime.error_message('No file available on server.')
+						if Data[0:1] == 'n':
+							DataReceived = 0
+							if Vues[index].size() > 0:
+								DataReceived += 1
+								Vues[index].run_command('erase')
+							if Data[1:].split(',', 1)[1] != '':
+								DataReceived += 1
+								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
+							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
+							Old[index][1] = Vues[index].size()
+						else:
+							Data = Data[:len(Data) - 1]
+							Offset = 0
+							for Data in Data.split(chr(0)):
+								DataReceived = 1
+								if Data[0:1] == 'i':
+									Vues[index].run_command('insertion', {'Data': Data[1:]})
+								elif Data[0:1] == 'd':
+									Vues[index].run_command('deletion', {'Data': Data[1:]})
+
+
 				except ValueError:
 					pass
 
@@ -55,7 +136,7 @@ class ConnectFileCommand(sublime_plugin.TextCommand):
 					Sockets.append(Sock)
 					if not Started:
 						Started = True
-						# sublime.set_timeout_async(Loop, 0)
+						sublime.set_timeout_async(Loop, 0)
 				except:
 					sublime.error_message('Unable to connect.')
 			except:
@@ -120,7 +201,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 			try:
 				index = Vues.index(view)
 				d = difflib.Differ()
-				Message = str(Old[index][1]) + '|' + Changes(''.join(d.compare(Old[index][0], view.substr(sublime.Region(0, view.size()))))) + chr(1)
+				Message = str(Old[index][1]) + '|' + Changes(''.join(d.compare(Old[index][0], view.substr(sublime.Region(0, view.size())))))
 				Old[index][0] = view.substr(sublime.Region(0, view.size()))
 				Old[index][1] = view.size()
 				Sockets[index].send(Encode(Message))

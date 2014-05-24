@@ -1,48 +1,49 @@
 import socket, select, sys
 
-def prompt() :
+def Encode(Mesage):
+	return (Mesage + chr(1)).encode('utf-8')
+
+def Prompt() :
 	sys.stdout.write('-> ')
 	sys.stdout.flush()
 
-if __name__ == "__main__":
+if(len(sys.argv) < 3) :
+	print('Usage : python3 Client.py Hostname Port')
+	sys.exit()
+Host = sys.argv[1]
+Port = int(sys.argv[2])
 
-	if(len(sys.argv) < 3) :
-		print('Usage : python3 Client.py hostname port')
-		sys.exit()
-	host = sys.argv[1]
-	port = int(sys.argv[2])
+Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+Socket.settimeout(2)
 
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.settimeout(2)
+try :
+	Socket.connect((Host, Port))
+except :
+	print('Unable to connect')
+	sys.exit()
 
-	try :
-		s.connect((host, port))
-	except :
-		print('Unable to connect')
-		sys.exit()
+print('Connected to remote host. Start sending messages :')
+Prompt()
 
-	print('Connected to remote host. Start sending messages :')
-	prompt()
+while True:
+	socket_list = [sys.stdin, Socket]
+	ready = select.select(socket_list , [], [])
 
-	while True:
-		socket_list = [sys.stdin, s]
-		ready = select.select(socket_list , [], [])
-
-		for sock in ready[0]:
-			if sock == s:
-				data = sock.recv(4096)
-				if not data :
-					print('\nDisconnected from chat server')
-					sys.exit()
-				else :
-					sys.stdout.write(data.decode("utf-8") + "\n")
-					prompt()
-
+	for sock in ready[0]:
+		if sock == Socket:
+			data = sock.recv(4096)
+			if not data :
+				print('\nDisconnected from chat server')
+				sys.exit()
 			else :
-				msg = sys.stdin.readline()
-				if msg[0] == 'ß':
-					s.send(('Coucou' + chr(0) + 'Bref').encode('utf-8'))
-				else:
-					s.send(msg[0:len(msg) - 1].encode('utf-8'))
+				sys.stdout.write(data.decode("utf-8") + "\n")
+				Prompt()
 
-				prompt()
+		else :
+			Message = sys.stdin.readline()
+			if Message[0:1] == 'ß':
+				Socket.send(Encode(Message[0:len(Message) - 1] + chr(0)))
+			else:
+				Socket.send(Encode(Message[0:len(Message) - 1]))
+
+			Prompt()
