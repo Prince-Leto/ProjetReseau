@@ -102,6 +102,23 @@ def Loop():
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
+						elif Data[0:1] == 'k':
+							Addr = Data[1:].split(':')[0]
+							Key = Data[1:].split(':')[1].split('|')
+							for i in range(len(Key)):
+								Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
+							OCursors[index] = Key
+							Vues[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
+							Over = False
+							for K in OCursors[index]:
+								for L in Cursors[index]:
+									for l_other in Vues[index].lines(K):
+										for l_me in Vues[index].lines(L):
+											if l_me == l_other:
+												Over = True
+
+							Vues[index].set_read_only(Over)
+
 						else:
 							Data = Data[:len(Data) - 1]
 							Offset = 0
@@ -213,7 +230,31 @@ class ListenerCommand(sublime_plugin.EventListener):
 			DataReceived -= 1
 
 	def on_selection_modified(self, view):
-		pass
+		global Sockets, Vues, Cursors, OCursors
+		try:
+			index = Vues.index(view)
+			Cursors[index] = list(view.sel())
+			m = ''
+			for i in range(len(view.sel()) - 1):
+				m += str(view.sel()[i].begin()) + ',' + str(view.sel()[i].end()) + '|'
+			m += str(view.sel()[len(view.sel()) - 1].begin()) + ',' + str(view.sel()[len(view.sel()) - 1].end())
+			Sockets[index].send(Encode('k' + m))
+			Over = False
+
+			for K in OCursors[index]:
+				for L in Cursors[index]:
+					for l_other in view.lines(K):
+						for l_me in view.lines(L):
+							if l_me == l_other:
+								Over = True
+			if Over and len(Cursors[index]) == 1 and Cursors[index][0].end() == Cursors[index][0].begin() and (Cursors[index][0].begin() == view.size() or Cursors[index][0].begin() == 0):
+				DataReceived = 1
+				view.run_command('insertion', {'Data': str(Cursors[index][0].begin()) + ',' + '\n'})
+
+			view.set_read_only(Over)
+
+		except ValueError:
+			pass
 
 	def on_close(self, view):
 		global Vues, Sockets, Cursors

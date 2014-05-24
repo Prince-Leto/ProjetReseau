@@ -38,9 +38,7 @@ def RemoteFiles(Sock):
 		for f in range(len(Files) - 1):
 			m += Files[f][0] + ","
 		m += Files[len(Files) - 1][0]
-	print(m)
 	Sock.send(Encode(m))
-	print('Sent')
 
 Sockets.append(Serveur)
 
@@ -71,9 +69,12 @@ while True:
 						elif Data[0:1] == 'c':
 							Files.append([Data[1:], '', 0])
 							RemoteFiles(Sock)
+						elif Data[0:1] == 'k':
+							print(Data)
+							Data = 'k' + str(SocketInfos[Sock][1][1]) + ":" + Data[1:]
+							BroadCast(Sock, Encode(Data))
 						else:
 							Size, Data = Data.split('|', 1)
-							print(int(Size), len(Files[SocketInfos[Sock][0]][1]))
 							if int(Size) == len(Files[SocketInfos[Sock][0]][1]): # TODO ; check size
 								BroadCast(Sock, Encode(Data))
 								Offset = 0
@@ -87,7 +88,8 @@ while True:
 										Files[SocketInfos[Sock][0]][1] = Files[SocketInfos[Sock][0]][1][:int(Data[1:].split(",", 1)[0]) - Offset] + Files[SocketInfos[Sock][0]][1][int(Data[1:].split(",", 1)[1]) - Offset:]
 										Offset += int(Data[1:].split(",", 1)[1]) - int(Data[1:].split(",", 1)[0])
 							else:
-								print('Conflict in message order.')
+								print('Conflict in message order. Resending data')
+								Sock.send(Encode('n,' + Files[SocketInfos[Sock][0]][1]))
 				else:
 					print('Client disconnected')
 					Sock.close()

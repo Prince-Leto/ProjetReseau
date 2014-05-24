@@ -42,7 +42,7 @@ while True:
 		else :
 			Message = sys.stdin.readline()
 			if Message[0:1] == 'ß':
-				Socket.send(Encode(Message[0:len(Message) - 1] + chr(0)))
+				Socket.send(Encode(Message[1:len(Message) - 1] + chr(0)))
 			else:
 				Socket.send(Encode(Message[0:len(Message) - 1]))
 
