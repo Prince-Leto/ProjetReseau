@@ -1,5 +1,4 @@
 [
-	{ "keys": ["ctrl+shift+u"], "command": "create_socket" },
-	{ "keys": ["ctrl+shift+i"], "command": "remote_file" },
-	{ "keys": ["ctrl+shift+c"], "command": "create_file" }
+  { "keys": ["ctrl+shift+u"], "command": "append_file" },
+	{ "keys": ["ctrl+shift+i"], "command": "connect_file" }
 ]

@@ -1,6 +1,4 @@
 [
-	{ "caption": "LISS: Connect this file...", "command": "create_socket" },
-	{ "caption": "LISS: Create new file...", "command": "create_file" },
-	{ "caption": "LISS: Select file...", "command": "remote_file" },
-	{ "caption": "LISS: Test", "command": "test" }
+  { "caption": "LISS: Connect to a server...", "command": "append_file" },
+	{ "caption": "LISS: Connect this file...", "command": "connect_file" }
 ]

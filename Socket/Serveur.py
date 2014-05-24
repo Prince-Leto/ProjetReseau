@@ -1,36 +1,48 @@
 import socket, select, sys, os
 
-LIST = []
-BUFFER = 4096
-PORT = 5000
+Sockets = []
+Buffer = 4096
+Port = 5000
+
+def SeparateData(Data):
+	Data = Data[:len(Data) - 1]
+	return Data.split(chr(1))
 
 serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serveur.bind(("", PORT))
+serveur.bind(("", Port))
 serveur.listen(10)
 
-LIST.append(serveur)
+Sockets.append(serveur)
 
-print("Serveur started on port " + str(PORT))
+print("Serveur started on port " + str(Port))
 
 while True:
-	read, write, errors = select.select(LIST, [], [])
+	read, write, errors = select.select(Sockets, [], [])
 
-	for sock in read:
-		if sock == serveur:
+	for Sock in read:
+		if Sock == serveur:
 			sockc, addr = serveur.accept()
-			LIST.append(sockc)
+			Sockets.append(sockc)
 			print("Client (%s, %s) connected" % addr)
 
 		else:
 			try:
-				data = sock.recv(BUFFER)
-				data = data.decode('utf-8')
-				print(data.split(chr(0), data.count(chr(0)) - 1))
+				Data = Sock.recv(Buffer)
+				if Data:
+					Data = Data.decode('utf-8')
+					for Data in SeparateData(Data):
+						Size, Data = Data.split('|', 1) # TODO, check size
+						Data = Data[:len(Data) - 1]
+						print(Data.split(chr(0)))
+				else:
+					print('Client disconnected')
+					Sock.close()
+					Sockets.remove(Sock)
 
 			except:
 				print('Client disconnected')
-				sock.close()
-				LIST.remove(sock)
+				Sock.close()
+				Sockets.remove(Sock)
 
 serveur.close()
