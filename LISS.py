@@ -9,6 +9,7 @@ Vues = []
 Cursors = []
 OCursors = []
 DataReceived = 0
+Realoding = False
 Started = False
 
 Buffer = 4096
@@ -102,6 +103,7 @@ def Loop():
 								sublime.error_message('No file available on server.')
 						elif Data[0:1] == 'n': # If we have to replace all the content
 							DataReceived = 0
+							OCursors[index] = [] # Should receive other's cursors from server
 							if Vues[index].size() > 0:
 								DataReceived += 1
 								Vues[index].run_command('erase')
@@ -110,7 +112,6 @@ def Loop():
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
-							OCursors[index] = [] # Should receive other's cursors from server
 						elif Data[0:1] == 'k':
 							Addr = Data[1:].split(':')[0]
 							Key = Data[1:].split(':')[1].split('|')
@@ -222,9 +223,10 @@ def Changes(DataDiff):
 class ListenerCommand(sublime_plugin.EventListener):
 	def on_modified(self, view):
 		global Old, Sockets, Vues, DataReceived
-		if DataReceived == 0:
-			try:
-				index = Vues.index(view)
+		try:
+			index = Vues.index(view)
+			print('Data' + str(DataReceived) + '\'' + view.substr(sublime.Region(0, view.size())) + '\'')
+			if DataReceived == 0:
 				d = difflib.Differ()
 				Message = str(Old[index][1]) + '|' + Changes(''.join(d.compare(Old[index][0], view.substr(sublime.Region(0, view.size())))))
 				print(Old[index][1])
@@ -232,11 +234,12 @@ class ListenerCommand(sublime_plugin.EventListener):
 				Old[index][1] = view.size()
 				Sockets[index].send(Encode(Message))
 
-			except ValueError:
-				pass
+			else:
+				DataReceived -= 1
 
-		else:
-			DataReceived -= 1
+		except ValueError:
+			print('Coucou')
+			pass
 
 	def on_selection_modified(self, view):
 		global Sockets, Vues, Cursors, OCursors
