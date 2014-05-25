@@ -13,13 +13,16 @@ Started = False
 
 Buffer = 4096
 
+# Encode messages before sending
 def Encode(Mesage):
 	return (Mesage + chr(1)).encode('utf-8')
 
+# Separate messages that can be received in one time
 def SeparateData(Data):
 	Data = Data[:len(Data) - 1]
 	return Data.split(chr(1))
 
+# Send a request for the list of files available
 class RemoteFileCommand(sublime_plugin.TextCommand):
 	global Sockets, Vues
 	def run(self, edit):
@@ -28,6 +31,7 @@ class RemoteFileCommand(sublime_plugin.TextCommand):
 		except ValueError:
 			sublime.error_message('This file is not connected.')
 
+# Create a new file on the serveur
 class CreateFileCommand(sublime_plugin.TextCommand):
 	def run(self, view):
 		global Sockets, Vues
@@ -43,6 +47,7 @@ class CreateFileCommand(sublime_plugin.TextCommand):
 				sublime.error_message('This file is not connected.')
 		sublime.active_window().show_input_panel('Name', '', onDone, None, None)
 
+# Insert some text
 class InsertionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
 		status = self.view.is_read_only()
@@ -50,6 +55,7 @@ class InsertionCommand(sublime_plugin.TextCommand):
 		self.view.insert(edit, int(Data.split(',', 1)[0]), Data.split(',', 1)[1])
 		self.view.set_read_only(status)
 
+# Delete some text
 class DeletionCommand(sublime_plugin.TextCommand):
 	def run(self, edit, Data):
 		status = self.view.is_read_only()
@@ -57,6 +63,7 @@ class DeletionCommand(sublime_plugin.TextCommand):
 		self.view.erase(edit, sublime.Region(int(Data.split(',', 1)[0]), int(Data.split(',', 1)[1])))
 		self.view.set_read_only(status)
 
+# Erase all the content
 class EraseCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		status = self.view.is_read_only()
@@ -64,8 +71,9 @@ class EraseCommand(sublime_plugin.TextCommand):
 		self.view.erase(edit, sublime.Region(0, self.view.size()))
 		self.view.set_read_only(status)
 
+# Infinite loop to listen for sockets
 def Loop():
-	global Sockets, Vues, DataReceived, OCursors
+	global Sockets, Vues, DataReceived, OCursors, Old
 	while True:
 		Ready = select(Sockets, [], [])
 		for Sock in Ready[0]:
@@ -92,7 +100,7 @@ def Loop():
 								sublime.active_window().show_quick_panel(Data[1:].split(','), onDone)
 							else:
 								sublime.error_message('No file available on server.')
-						if Data[0:1] == 'n':
+						elif Data[0:1] == 'n': # If we have to replace all the content
 							DataReceived = 0
 							if Vues[index].size() > 0:
 								DataReceived += 1
@@ -102,6 +110,7 @@ def Loop():
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
+							OCursors[index] = [] # Should receive other's cursors from server
 						elif Data[0:1] == 'k':
 							Addr = Data[1:].split(':')[0]
 							Key = Data[1:].split(':')[1].split('|')
@@ -144,7 +153,7 @@ class ConnectFileCommand(sublime_plugin.TextCommand):
 				Vue = self.view
 				Vues.append(Vue)
 				Cursors.append(list(Vue.sel()))
-				OCursors.append([]) # Should receive other's cursors from server
+				OCursors.append([])
 				Old.append(['', 0])
 
 				try:
@@ -172,7 +181,7 @@ class AppendFileCommand(sublime_plugin.WindowCommand):
 				Vue = self.window.new_file()
 				Vues.append(Vue)
 				Cursors.append(list(Vue.sel()))
-				OCursors.append([]) # Should receive other's cursors from server
+				OCursors.append([])
 				Old.append(['', 0])
 
 				try:
@@ -218,6 +227,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 				index = Vues.index(view)
 				d = difflib.Differ()
 				Message = str(Old[index][1]) + '|' + Changes(''.join(d.compare(Old[index][0], view.substr(sublime.Region(0, view.size())))))
+				print(Old[index][1])
 				Old[index][0] = view.substr(sublime.Region(0, view.size()))
 				Old[index][1] = view.size()
 				Sockets[index].send(Encode(Message))
@@ -247,8 +257,9 @@ class ListenerCommand(sublime_plugin.EventListener):
 							if l_me == l_other:
 								Over = True
 			if Over and len(Cursors[index]) == 1 and Cursors[index][0].end() == Cursors[index][0].begin() and (Cursors[index][0].begin() == view.size() or Cursors[index][0].begin() == 0):
-				DataReceived = 1
 				view.run_command('insertion', {'Data': str(Cursors[index][0].begin()) + ',' + '\n'})
+				Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
+				Old[index][1] = Vues[index].size()
 
 			view.set_read_only(Over)
 
