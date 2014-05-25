@@ -102,7 +102,6 @@ while True:
 				Data = Sock.recv(Buffer)
 				if Data:
 					Data = Data.decode('utf-8')
-					print(Data)
 					for Data in SeparateData(Data):
 						if Data == 'GetFiles':
 							RemoteFiles(Sock)
@@ -117,7 +116,6 @@ while True:
 							BroadCast(Sock, Encode(Data))
 						else:
 							Size, Data = Data.split('|', 1)
-							# print(Size, Data)
 							if int(Size) == len(Files[SocketInfos[Sock][0]][1]): # TODO ; check size
 								BroadCast(Sock, Encode(Data))
 								Offset = 0

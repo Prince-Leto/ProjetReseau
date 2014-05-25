@@ -90,7 +90,6 @@ def Loop():
 				try:
 					index = Sockets.index(Sock)
 					Data = Data.decode('utf-8')
-					print(Data)
 					for Data in SeparateData(Data):
 						if Data[0:1] == 'f':
 							if Data != 'f':
@@ -222,23 +221,27 @@ def Changes(DataDiff):
 
 class ListenerCommand(sublime_plugin.EventListener):
 	def on_modified(self, view):
-		global Old, Sockets, Vues, DataReceived
+		global Old, Sockets, Vues, DataReceived, Cursors
 		try:
 			index = Vues.index(view)
-			print('Data' + str(DataReceived) + '\'' + view.substr(sublime.Region(0, view.size())) + '\'')
 			if DataReceived == 0:
 				d = difflib.Differ()
 				Message = str(Old[index][1]) + '|' + Changes(''.join(d.compare(Old[index][0], view.substr(sublime.Region(0, view.size())))))
-				print(Old[index][1])
 				Old[index][0] = view.substr(sublime.Region(0, view.size()))
 				Old[index][1] = view.size()
-				Sockets[index].send(Encode(Message))
+				try:
+					Sockets[index].send(Encode(Message))
+				except:
+					sublime.error_message('Connection lost.')
+					Sockets[index].close()
+					del Sockets[index]
+					del Vues[index]
+					del Cursors[index]
 
 			else:
 				DataReceived -= 1
 
 		except ValueError:
-			print('Coucou')
 			pass
 
 	def on_selection_modified(self, view):
@@ -250,7 +253,15 @@ class ListenerCommand(sublime_plugin.EventListener):
 			for i in range(len(view.sel()) - 1):
 				m += str(view.sel()[i].begin()) + ',' + str(view.sel()[i].end()) + '|'
 			m += str(view.sel()[len(view.sel()) - 1].begin()) + ',' + str(view.sel()[len(view.sel()) - 1].end())
-			Sockets[index].send(Encode('k' + m))
+			try:
+				Sockets[index].send(Encode('k' + m))
+			except:
+				sublime.error_message('Connection lost.')
+				Sockets[index].close()
+				del Sockets[index]
+				del Vues[index]
+				del Cursors[index]
+
 			Over = False
 
 			for K in OCursors[index]:
