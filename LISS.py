@@ -129,7 +129,6 @@ def Loop():
 								elif Data[0:1] == 'd':
 									Vues[index].run_command('deletion', {'Data': Data[1:]})
 
-
 				except ValueError:
 					pass
 

@@ -1,11 +1,16 @@
-import socket
+import socket, os
 from select import select
+from time import sleep
+from threading import Thread
 
 Sockets = []
-Files = [['Test', '', 0]]
+Files = []
 SocketInfos = {}
 Buffer = 4096
 Port = 5000
+MaxModif = 10
+TimeMax = 10
+Path = os.path.dirname(os.path.realpath(__file__))
 
 Serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 Serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -31,6 +36,27 @@ def BroadCast(Sock, Message):
 				Sockets.remove(Socket)
 				# Should also clean SocketInfos
 
+def LookFiles():
+	global Files, Path
+	try:
+		for FileName in os.listdir(Path + '/LISSData'):
+			if os.path.isfile(os.path.join(Path + '/LISSData', FileName)):
+				File = open(os.path.join(Path + '/LISSData', FileName), 'r')
+				Files.append([FileName, File.read(), 0])
+				File.close()
+	except:
+		os.mkdir(Path + '/LISSData')
+
+LookFiles()
+
+def WriteFile(i):
+	global Files
+	File = open(os.path.join(Path + '/LISSData', Files[i][0]), 'w')
+	File.write(Files[i][1])
+	File.close()
+	Files[i][2] = 0
+	print('File ' + Files[i][0] + ' saved')
+
 def RemoteFiles(Sock):
 	global Files
 	m = 'f'
@@ -42,7 +68,23 @@ def RemoteFiles(Sock):
 
 Sockets.append(Serveur)
 
+class myClassA(Thread):
+	def __init__(self):
+		Thread.__init__(self)
+		self.daemon = True
+		self.start()
+	def run(self):
+		global Files
+		while True:
+			for i in range(len(Files)):
+				if Files[i][2] != 0:
+					WriteFile(i)
+
+			sleep(TimeMax)
+
 print('Serveur started on port ' + str(Port))
+
+myClassA()
 
 while True:
 	read, write, errors = select(Sockets, [], [])
@@ -70,7 +112,6 @@ while True:
 							Files.append([Data[1:], '', 0])
 							RemoteFiles(Sock)
 						elif Data[0:1] == 'k':
-							print(Data)
 							Data = 'k' + str(SocketInfos[Sock][1][1]) + ":" + Data[1:]
 							BroadCast(Sock, Encode(Data))
 						else:
@@ -87,6 +128,8 @@ while True:
 										Files[SocketInfos[Sock][0]][2] += 1
 										Files[SocketInfos[Sock][0]][1] = Files[SocketInfos[Sock][0]][1][:int(Data[1:].split(",", 1)[0]) - Offset] + Files[SocketInfos[Sock][0]][1][int(Data[1:].split(",", 1)[1]) - Offset:]
 										Offset += int(Data[1:].split(",", 1)[1]) - int(Data[1:].split(",", 1)[0])
+								if Files[SocketInfos[Sock][0]][2] >= MaxModif:
+									WriteFile(SocketInfos[Sock][0])
 							else:
 								print('Conflict in message order. Resending data')
 								Sock.send(Encode('n,' + Files[SocketInfos[Sock][0]][1]))
