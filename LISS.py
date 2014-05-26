@@ -104,6 +104,7 @@ def Loop():
 						elif Data[0:1] == 'n' or Data[0:1] == 'r': # If we have to replace all the content, or if we are switching to a new file
 							DataReceived = 0
 							Realoding = True
+							Mine = list(Vues[index].sel())
 							for Others in OCursors[index]:
 								Vues[index].erase_regions(OCursors[index][Others][0])
 							if Data[0:1] == 'n':
@@ -114,6 +115,8 @@ def Loop():
 							if Data[1:].split(',', 1)[1] != '':
 								DataReceived += 1
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
+							Vues[index].sel().clear()
+							Vues[index].sel().add_all(Mine)
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
 							Realoding = False
