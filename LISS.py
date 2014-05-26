@@ -3,14 +3,13 @@ from select import select
 
 import sublime, sublime_plugin
 
-Sockets = []
-Old = []
-Vues = []
-Cursors = []
-OCursors = []
-DataReceived = 0
-Realoding = False
-Started = False
+Sockets = [] # Clients sockets
+Old = [] # Old data
+Vues = [] # List of view connected
+Cursors = [] # My cursors
+OCursors = [] # Cursors from other people
+DataReceived = 0 # If data is received in order to prevent callback from modification
+Started = False # If loop is started
 
 Buffer = 4096
 
@@ -91,7 +90,7 @@ def Loop():
 					index = Sockets.index(Sock)
 					Data = Data.decode('utf-8')
 					for Data in SeparateData(Data):
-						if Data[0:1] == 'f':
+						if Data[0:1] == 'f': # Files available on server
 							if Data != 'f':
 								def onDone(i):
 									global client
@@ -100,7 +99,7 @@ def Loop():
 								sublime.active_window().show_quick_panel(Data[1:].split(','), onDone)
 							else:
 								sublime.error_message('No file available on server.')
-						elif Data[0:1] == 'n': # If we have to replace all the content
+						elif Data[0:1] == 'n': # If we have to replace all the content, or if we are switching to a new file
 							DataReceived = 0
 							OCursors[index] = [] # Should receive other's cursors from server
 							if Vues[index].size() > 0:
@@ -111,7 +110,7 @@ def Loop():
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
-						elif Data[0:1] == 'k':
+						elif Data[0:1] == 'k': # Cursors from others
 							Addr = Data[1:].split(':')[0]
 							Key = Data[1:].split(':')[1].split('|')
 							for i in range(len(Key)):
@@ -128,7 +127,7 @@ def Loop():
 
 							Vues[index].set_read_only(Over)
 
-						else:
+						else: # Data inserted
 							Data = Data[:len(Data) - 1]
 							Offset = 0
 							for Data in Data.split(chr(0)):
@@ -137,10 +136,13 @@ def Loop():
 									Vues[index].run_command('insertion', {'Data': Data[1:]})
 								elif Data[0:1] == 'd':
 									Vues[index].run_command('deletion', {'Data': Data[1:]})
+							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
+							Old[index][1] = Vues[index].size()
 
 				except ValueError:
 					pass
 
+# Connect the actual file. To prevent a bug from sublime that I have reported
 class ConnectFileCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		global Cursors, OCursors, Old, Vues, Started, Sockets
@@ -169,6 +171,7 @@ class ConnectFileCommand(sublime_plugin.TextCommand):
 
 		sublime.active_window().show_input_panel('Hostname:port', '', onDone, None, None)
 
+# Connect and append a new file - actually under a bug
 class AppendFileCommand(sublime_plugin.WindowCommand):
 	def run(self):
 		global Cursors, OCursors, Old, Vues, Started, Sockets
@@ -197,6 +200,7 @@ class AppendFileCommand(sublime_plugin.WindowCommand):
 
 		self.window.show_input_panel('Hostname:port', '', onDone, None, None)
 
+# Diff the old data with the new one. Write the list of modifications
 def Changes(DataDiff):
 	Last = ''
 	Indice = 0
@@ -220,7 +224,7 @@ def Changes(DataDiff):
 	return Message
 
 class ListenerCommand(sublime_plugin.EventListener):
-	def on_modified(self, view):
+	def on_modified(self, view): # On view modified
 		global Old, Sockets, Vues, DataReceived, Cursors
 		try:
 			index = Vues.index(view)
@@ -244,7 +248,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 		except ValueError:
 			pass
 
-	def on_selection_modified(self, view):
+	def on_selection_modified(self, view): # On cursors modified
 		global Sockets, Vues, Cursors, OCursors
 		try:
 			index = Vues.index(view)
@@ -280,7 +284,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 		except ValueError:
 			pass
 
-	def on_close(self, view):
+	def on_close(self, view): # Close socket when closing the file
 		global Vues, Sockets, Cursors
 		try:
 			index = Vues.index(view)
