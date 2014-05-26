@@ -1,5 +1,6 @@
 [
   { "keys": ["ctrl+shift+u"], "command": "append_file" },
   { "keys": ["ctrl+shift+i"], "command": "connect_file" },
-	{ "keys": ["ctrl+shift+o"], "command": "remote_file" }
+  { "keys": ["ctrl+shift+o"], "command": "remote_file" },
+	{ "keys": ["ctrl+shift+l"], "command": "create_file" }
 ]

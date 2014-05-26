@@ -115,6 +115,9 @@ def Loop():
 							if Data[1:].split(',', 1)[1] != '':
 								DataReceived += 1
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
+							if Data[0:1] == 'r':
+								for Other in OCursors[index]:
+									Vues[index].add_regions(OCursors[index][Other][0], OCursors[index][Other][1], 'string', 'dot', sublime.DRAW_EMPTY)
 							Vues[index].sel().clear()
 							Vues[index].sel().add_all(Mine)
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
