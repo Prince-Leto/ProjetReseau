@@ -34,7 +34,7 @@ def SeparateData(Data):
 
 # Send data to the others clients connected
 def BroadCast(Sock, Message):
-	global Sockets, Serveur, Fichiers
+	global Sockets, Serveur, Fichiers, SocketInfos
 	for Socket in Sockets:
 		if Socket != Serveur and Socket != Sock and SocketInfos[Sock][0] == SocketInfos[Socket][0] and SocketInfos[Socket][0] != -1:
 			try:
@@ -154,14 +154,13 @@ while True:
 					print('Client disconnected')
 					Sock.close()
 					Sockets.remove(Sock)
-					del SocketInfos[Socket]
-
+					del SocketInfos[Sock]
 
 			except:
 				print('Client disconnected')
 				Sock.close()
 				Sockets.remove(Sock)
-				del SocketInfos[Socket]
+				del SocketInfos[Sock]
 
 
 Serveur.close()
