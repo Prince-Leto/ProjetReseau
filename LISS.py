@@ -104,6 +104,8 @@ def Loop():
 						elif Data[0:1] == 'n' or Data[0:1] == 'r': # If we have to replace all the content, or if we are switching to a new file
 							DataReceived = 0
 							Realoding = True
+							for Others in OCursors[index]:
+								Vues[index].erase_regions(OCursors[index][Others][0])
 							if Data[0:1] == 'n':
 								OCursors[index] = {} # Should receive other's cursors from server
 							if Vues[index].size() > 0:
@@ -120,15 +122,11 @@ def Loop():
 							Key = Data[1:].split(':')[1].split('|')
 							for i in range(len(Key)):
 								Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
-							# try:
-
-								# indice = OCursors[index].index(Addr)
-							OCursors[index][Addr] = Key
-							# except ValueError:
+							OCursors[index][Addr] = [Addr, Key]
 							Vues[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
 							Over = False
 							for Others in OCursors[index]:
-								for K in OCursors[index][Others]:
+								for K in OCursors[index][Others][1]:
 									for L in Cursors[index]:
 										for LOther in Vues[index].lines(K):
 											for LMe in Vues[index].lines(L):
@@ -251,6 +249,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 					del Sockets[index]
 					del Vues[index]
 					del Cursors[index]
+					del OCursors[index]
 
 			else:
 				DataReceived -= 1
@@ -280,7 +279,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 			Over = False
 
 			for Others in OCursors[index]:
-				for K in OCursors[index][Others]:
+				for K in OCursors[index][Others][1]:
 					for L in Cursors[index]:
 						for LOther in view.lines(K):
 							for LMe in view.lines(L):

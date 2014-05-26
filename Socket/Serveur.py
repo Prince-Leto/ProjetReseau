@@ -43,7 +43,7 @@ def BroadCast(Sock, Message):
 				print('Client disconnected')
 				Socket.close()
 				Sockets.remove(Socket)
-				# Should also clean SocketInfos
+				del SocketInfos[Socket]
 
 # Look for file saved on server
 def LookFiles():
@@ -154,10 +154,14 @@ while True:
 					print('Client disconnected')
 					Sock.close()
 					Sockets.remove(Sock)
+					del SocketInfos[Socket]
+
 
 			except:
 				print('Client disconnected')
 				Sock.close()
 				Sockets.remove(Sock)
+				del SocketInfos[Socket]
+
 
 Serveur.close()
