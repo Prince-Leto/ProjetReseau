@@ -10,6 +10,7 @@ Cursors = [] # My cursors
 OCursors = [] # Cursors from other people
 DataReceived = 0 # If data is received in order to prevent callback from modification
 Started = False # If loop is started
+Realoding = False # If loop is started
 
 Buffer = 4096
 
@@ -73,7 +74,7 @@ class EraseCommand(sublime_plugin.TextCommand):
 
 # Infinite loop to listen for sockets
 def Loop():
-	global Sockets, Vues, DataReceived, OCursors, Old
+	global Sockets, Vues, DataReceived, OCursors, Old, Realoding
 	while True:
 		Ready = select(Sockets, [], [])
 		for Sock in Ready[0]:
@@ -85,6 +86,7 @@ def Loop():
 				del Sockets[index]
 				del Vues[index]
 				del Cursors[index]
+				del OCursors[index]
 			else:
 				try:
 					index = Sockets.index(Sock)
@@ -99,9 +101,11 @@ def Loop():
 								sublime.active_window().show_quick_panel(Data[1:].split(','), onDone)
 							else:
 								sublime.error_message('No file available on server.')
-						elif Data[0:1] == 'n': # If we have to replace all the content, or if we are switching to a new file
+						elif Data[0:1] == 'n' or Data[0:1] == 'r': # If we have to replace all the content, or if we are switching to a new file
 							DataReceived = 0
-							OCursors[index] = [] # Should receive other's cursors from server
+							Realoding = True
+							if Data[0:1] == 'n':
+								OCursors[index] = {} # Should receive other's cursors from server
 							if Vues[index].size() > 0:
 								DataReceived += 1
 								Vues[index].run_command('erase')
@@ -110,20 +114,26 @@ def Loop():
 								Vues[index].run_command('insertion', {'Data': '0' + Data[1:]})
 							Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 							Old[index][1] = Vues[index].size()
+							Realoding = False
 						elif Data[0:1] == 'k': # Cursors from others
 							Addr = Data[1:].split(':')[0]
 							Key = Data[1:].split(':')[1].split('|')
 							for i in range(len(Key)):
 								Key[i] = sublime.Region(int(Key[i].split(',')[0]), int(Key[i].split(',')[1]))
-							OCursors[index] = Key
+							# try:
+
+								# indice = OCursors[index].index(Addr)
+							OCursors[index][Addr] = Key
+							# except ValueError:
 							Vues[index].add_regions(Addr, Key, 'string', 'dot', sublime.DRAW_EMPTY)
 							Over = False
-							for K in OCursors[index]:
-								for L in Cursors[index]:
-									for l_other in Vues[index].lines(K):
-										for l_me in Vues[index].lines(L):
-											if l_me == l_other:
-												Over = True
+							for Others in OCursors[index]:
+								for K in OCursors[index][Others]:
+									for L in Cursors[index]:
+										for LOther in Vues[index].lines(K):
+											for LMe in Vues[index].lines(L):
+												if LMe == LOther:
+													Over = True
 
 							Vues[index].set_read_only(Over)
 
@@ -155,7 +165,7 @@ class ConnectFileCommand(sublime_plugin.TextCommand):
 				Vue = self.view
 				Vues.append(Vue)
 				Cursors.append(list(Vue.sel()))
-				OCursors.append([])
+				OCursors.append({})
 				Old.append(['', 0])
 
 				try:
@@ -184,7 +194,7 @@ class AppendFileCommand(sublime_plugin.WindowCommand):
 				Vue = self.window.new_file()
 				Vues.append(Vue)
 				Cursors.append(list(Vue.sel()))
-				OCursors.append([])
+				OCursors.append({})
 				Old.append(['', 0])
 
 				try:
@@ -249,7 +259,7 @@ class ListenerCommand(sublime_plugin.EventListener):
 			pass
 
 	def on_selection_modified(self, view): # On cursors modified
-		global Sockets, Vues, Cursors, OCursors
+		global Sockets, Vues, Cursors, OCursors, Realoding
 		try:
 			index = Vues.index(view)
 			Cursors[index] = list(view.sel())
@@ -265,16 +275,18 @@ class ListenerCommand(sublime_plugin.EventListener):
 				del Sockets[index]
 				del Vues[index]
 				del Cursors[index]
+				del OCursors[index]
 
 			Over = False
 
-			for K in OCursors[index]:
-				for L in Cursors[index]:
-					for l_other in view.lines(K):
-						for l_me in view.lines(L):
-							if l_me == l_other:
-								Over = True
-			if Over and len(Cursors[index]) == 1 and Cursors[index][0].end() == Cursors[index][0].begin() and (Cursors[index][0].begin() == view.size() or Cursors[index][0].begin() == 0):
+			for Others in OCursors[index]:
+				for K in OCursors[index][Others]:
+					for L in Cursors[index]:
+						for LOther in view.lines(K):
+							for LMe in view.lines(L):
+								if LMe == LOther:
+									Over = True
+			if not Realoding and Over and len(Cursors[index]) == 1 and Cursors[index][0].end() == Cursors[index][0].begin() and (Cursors[index][0].begin() == view.size() or Cursors[index][0].begin() == 0):
 				view.run_command('insertion', {'Data': str(Cursors[index][0].begin()) + ',' + '\n'})
 				Old[index][0] = Vues[index].substr(sublime.Region(0, Vues[index].size()))
 				Old[index][1] = Vues[index].size()
@@ -292,5 +304,6 @@ class ListenerCommand(sublime_plugin.EventListener):
 			del Sockets[index]
 			del Vues[index]
 			del Cursors[index]
+			del OCursors[index]
 		except ValueError:
 			pass

@@ -1,4 +1,4 @@
-import socket, os
+import socket, os, sys
 from select import select
 from time import sleep
 from threading import Thread
@@ -7,10 +7,15 @@ Sockets = [] # Sockets - included server socket
 Files = [] # File list on server
 SocketInfos = {} # Infos about clients - Contain [FileConnected, Addr]
 Buffer = 4096 # Buffer size
-Port = 0 # Port where the server is listening
+Port = 5000 # Port where the server is listening
 MaxModif = 10 # Max modification before saving the file
 TimeMax = 10 # Time in second to check if a file is unsaved and modified
 Path = os.path.dirname(os.path.realpath(__file__))
+
+if(len(sys.argv) < 2) :
+	print('Usage : python3 Serveur.py Port')
+	sys.exit()
+Port = int(sys.argv[1])
 
 # Create a new socket
 Serveur = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -114,9 +119,12 @@ while True:
 					for Data in SeparateData(Data):
 						if Data == 'GetFiles': # Request for the file list
 							RemoteFiles(Sock)
-						elif Data[0:1] == 'f': # A is connecting to a file
-							SocketInfos[Sock][0] = int(Data[1:])
-							Sock.send(Encode('n,' + Files[SocketInfos[Sock][0]][1]))
+						elif Data[0:1] == 'f': # A client is connecting to a file
+							if SocketInfos[Sock][0] == int(Data[1:]):
+								Sock.send(Encode('r,' + Files[SocketInfos[Sock][0]][1]))
+							else:
+								SocketInfos[Sock][0] = int(Data[1:])
+								Sock.send(Encode('n,' + Files[SocketInfos[Sock][0]][1]))
 						elif Data[0:1] == 'c': # File creation
 							Files.append([Data[1:], '', 0])
 							RemoteFiles(Sock)
@@ -141,7 +149,7 @@ while True:
 									WriteFile(SocketInfos[Sock][0])
 							else: # Error, probably some issue with the network. Or people writing at the same time.
 								print('Conflict in message order. Resending data')
-								Sock.send(Encode('n,' + Files[SocketInfos[Sock][0]][1]))
+								Sock.send(Encode('r,' + Files[SocketInfos[Sock][0]][1]))
 				else:
 					print('Client disconnected')
 					Sock.close()
